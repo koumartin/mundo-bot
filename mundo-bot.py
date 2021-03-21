@@ -64,7 +64,8 @@ async def play_from_queue():
             voice_client = await voice.move_to(channel)
 
         # Play muundo.mp3
-        voice_client.play(discord.FFmpegPCMAudio(os.path.join(os.path.curdir, "muundo.mp3")))
+        audio_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "muundo.mp3")
+        voice_client.play(discord.FFmpegPCMAudio(audio_path))
 
         while voice_client.is_playing():
             # Not clean but it iiiis what it iiiis
