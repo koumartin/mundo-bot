@@ -8,6 +8,7 @@ from discord.ext import commands
 # ADDITIONAL INFORMATION:
 # Author: @koumartin
 # Date: 22/3/2021
+# Not really thread safe but I am lazy
 # -------------------------------------------
 
 # client = discord.Client()
@@ -19,6 +20,7 @@ TOKEN = "ODIyNTk0ODA1NDI2NDIxNzgx.YFUjHA.7FvSQXT6jvQGGxiXeoffRxQTf3U"
 # Create global variables
 mundo_queue = {}
 handling_mundo_queue = {}
+
 
 
 @bot.event
@@ -42,7 +44,6 @@ async def on_voice_state_update(member, before, after):
 
 @bot.command()
 async def mundo(ctx, num=1):
-
     await ctx.message.delete()
 
     if ctx.author.voice is not None:
@@ -56,6 +57,21 @@ async def mundo(ctx, num=1):
         await ctx.author.send("Mundo can't greet without voice channel.")
 
 
+@bot.command()
+async def shutup(ctx):
+    guild = ctx.guild
+
+    await ctx.message.delete()
+
+    if ctx.author.name != "KoudyCZ":
+        await ctx.author.send("You no tell Mundo what Mundo do!!!")
+        return
+
+    handling_mundo_queue[guild] = (True, True)
+    mundo_queue[guild] = queue.Queue()
+
+
+# Additional non Discord API functions for cleaner code
 async def add_to_queue(guild, channel, num=1):
     if guild not in mundo_queue:
         mundo_queue[guild] = queue.Queue()
@@ -65,10 +81,10 @@ async def add_to_queue(guild, channel, num=1):
         mundo_queue[guild].put(channel)
 
     if guild not in handling_mundo_queue:
-        handling_mundo_queue[guild] = False
+        handling_mundo_queue[guild] = (False, False)
 
     # If queue isn't already handled start handling it
-    if not handling_mundo_queue[guild]:
+    if not handling_mundo_queue[guild][0]:
         await play_from_queue(guild)
 
 
@@ -79,7 +95,12 @@ async def play_from_queue(guild):
     voice_client = discord.utils.get(bot.voice_clients, guild=guild)
 
     while not mundo_queue[guild].empty():
-        handling_mundo_queue[guild] = True
+        handling, stop = handling_mundo_queue[guild]
+        if stop is True:
+            handling_mundo_queue[guild] = (False, False)
+            return
+        else:
+            handling_mundo_queue[guild] = (True, False)
         channel = mundo_queue[guild].get()
 
         # In case bot isn't connected to a voice_channel yet
