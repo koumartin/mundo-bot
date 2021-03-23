@@ -93,6 +93,7 @@ async def play_from_queue(guild):
 
     # Finds current voice_channel in this guild
     voice_client = discord.utils.get(bot.voice_clients, guild=guild)
+    i = 0
 
     while not mundo_queue[guild].empty():
         handling, stop = handling_mundo_queue[guild]
@@ -102,6 +103,7 @@ async def play_from_queue(guild):
         else:
             handling_mundo_queue[guild] = (True, False)
         channel = mundo_queue[guild].get()
+        i += 1
 
         # In case bot isn't connected to a voice_channel yet
         if voice_client is None:
@@ -113,7 +115,11 @@ async def play_from_queue(guild):
                 await asyncio.sleep(.1)
             await voice_client.move_to(channel)
 
-        await play_mundo_sound(voice_client)
+        if i >= 5:
+            i = 0
+            await play_mundo_sound(voice_client, "mundo-say-name-often.mp3")
+        else:
+            await play_mundo_sound(voice_client, "muundo.mp3")
 
         while voice_client.is_playing():
             # Not clean but it iiiis what it iiiis
@@ -123,9 +129,9 @@ async def play_from_queue(guild):
     handling_mundo_queue[guild] = False
 
 
-async def play_mundo_sound(voice_client):
+async def play_mundo_sound(voice_client, file_name):
     # Play muundo.mp3
-    audio_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "muundo.mp3")
+    audio_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), file_name)
     voice_client.play(discord.FFmpegPCMAudio(audio_path))
 
 # RUN THE CLIENT
