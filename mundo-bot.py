@@ -41,7 +41,7 @@ async def on_voice_state_update(member, before, after):
 
 
 @bot.command()
-async def mundo(ctx):
+async def mundo(ctx, num=1):
 
     await ctx.message.delete()
 
@@ -51,17 +51,18 @@ async def mundo(ctx):
         voice_channel = None
 
     if voice_channel is not None:
-        await add_to_queue(ctx.guild, voice_channel)
+        await add_to_queue(ctx.guild, voice_channel, num)
     else:
         await ctx.author.send("Mundo can't greet without voice channel.")
 
 
-async def add_to_queue(guild, channel):
+async def add_to_queue(guild, channel, num=1):
     if guild not in mundo_queue:
         mundo_queue[guild] = queue.Queue()
 
     # Put channel to a music queue
-    mundo_queue[guild].put(channel)
+    for _ in range(num):
+        mundo_queue[guild].put(channel)
 
     if guild not in handling_mundo_queue:
         handling_mundo_queue[guild] = False
