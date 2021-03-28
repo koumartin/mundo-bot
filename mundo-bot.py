@@ -46,6 +46,13 @@ async def on_voice_state_update(member, before, after):
 async def mundo(ctx, num=1):
     await ctx.message.delete()
 
+    if num > 30:
+        await ctx.author.send("Mundo will no greet you so much. Mundo no stupid.")
+        return
+    if num < 0:
+        await ctx.author.send("Mundo no stupid, unlike you. No saying negative times...")
+        return
+
     if ctx.author.voice is not None:
         voice_channel = ctx.author.voice.channel
     else:
@@ -58,21 +65,30 @@ async def mundo(ctx, num=1):
 
 
 @bot.command()
-async def shutup(ctx):
+async def shutup(ctx, additional=""):
     guild = ctx.guild
+
+    voice_client = discord.utils.get(bot.voice_clients, guild=guild)
 
     await ctx.message.delete()
 
-    if ctx.author.name != "KoudyCZ":
+    if ctx.author.name != "KoudyCZ" and additional.lower() != "please":
         await ctx.author.send("You no tell Mundo what Mundo do!!!")
         return
+    else:
+        if additional.lower() == "please":
+            await ctx.author.send("You say please so nice... Okey Mundo be silent now.")
+        if voice_client is not None:
+            voice_client.stop()
+        handling_mundo_queue[guild] = (True, True)
+        mundo_queue[guild] = queue.Queue()
 
-    handling_mundo_queue[guild] = (True, True)
-    mundo_queue[guild] = queue.Queue()
 
-
+# -----------------------------------------------------
 # Additional non Discord API functions for cleaner code
+# -----------------------------------------------------
 async def add_to_queue(guild, channel, num=1):
+    global handling_mundo_queue, mundo_queue
     if guild not in mundo_queue:
         mundo_queue[guild] = queue.Queue()
 
@@ -84,7 +100,7 @@ async def add_to_queue(guild, channel, num=1):
         handling_mundo_queue[guild] = (False, False)
 
     # If queue isn't already handled start handling it
-    if not handling_mundo_queue[guild][0]:
+    if handling_mundo_queue[guild][0] is False:
         await play_from_queue(guild)
 
 
@@ -125,7 +141,8 @@ async def play_from_queue(guild):
             # Not clean but it iiiis what it iiiis
             await asyncio.sleep(.1)
 
-    await voice_client.disconnect()
+    if voice_client.is_connected():
+        await voice_client.disconnect()
     handling_mundo_queue[guild] = False
 
 
