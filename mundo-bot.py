@@ -3,6 +3,7 @@ import asyncio
 import queue
 import os
 from clashmanager import ClashManager
+from positions import Positions
 from discord.ext import commands
 from discord.ext.commands.context import Context as Context
 from typing import Dict, Tuple
@@ -16,7 +17,9 @@ from typing import Dict, Tuple
 
 class MundoBot(commands.Bot):
     def __init__(self):
-        commands.Bot.__init__(self, command_prefix='!')
+        intents = discord.Intents.default()
+        intents.members = True
+        commands.Bot.__init__(self, command_prefix='!', intents=intents)
         self.TOKEN = "ODIyNTk0ODA1NDI2NDIxNzgx.YFUjHA.7FvSQXT6jvQGGxiXeoffRxQTf3U"
         self.path = os.path.dirname(os.path.abspath(__file__))
 
@@ -25,19 +28,18 @@ class MundoBot(commands.Bot):
         # Value is tuple of (handling, stop)
         self.handling_mundo_queue: Dict[discord.Guild, Tuple[bool, bool]] = {}
 
-        self.accepted_reactions = ['👍']
-
         self.clash: ClashManager = ClashManager(self.path)
         self.add_all_commands()
+        self.accepted_reactions = Positions.accepted_reactions()
 
     def start_running(self):
         self.run(self.TOKEN)
 
+    # Gives bot all events and commands
     def add_all_commands(self):
         @self.event
         async def on_ready():
             await self.check_expired_clashes()
-
             print("Logged in.")
 
         @self.event
@@ -53,18 +55,36 @@ class MundoBot(commands.Bot):
 
         @self.event
         async def on_raw_reaction_add(reaction: discord.RawReactionActionEvent):
-            clashes = self.clash.clashes
-            for name, (guild_id, channel_id, message_id, date, role_id) in clashes:
+            for name, (guild_id, channel_id, message_id, date, role_id) in self.clash.clashes.items():
                 if reaction.guild_id == guild_id and reaction.channel_id == channel_id and reaction.message_id == message_id:
-                    if reaction.emoji in self.accepted_reactions:
+                    if reaction.emoji.name in self.accepted_reactions:
                         guild = self.get_guild(guild_id)
+                        position = Positions.get_position(reaction.emoji.name)
                         role = guild.get_role(role_id)
-                        reaction.member.add_role(role)
 
-            # TODO: Read if reaction is one of desired
-            # TODO: Give user role associated with the clash
+                        await reaction.member.add_roles(role)
+                        self.clash.register_player(name, reaction.member.name, position)
+
+                        break
+
             # TODO: Keep track of players in the clash
             # TODO: Updating message at the start of channel telling who is playing
+            # TODO: Mundo has to run in cloud or check if reactions are corresponding to current players in DS
+
+        @self.event
+        async def on_raw_reaction_remove(reaction: discord.RawReactionActionEvent):
+            for name, (guild_id, channel_id, message_id, date, role_id) in self.clash.clashes.items():
+                if reaction.guild_id == guild_id and reaction.channel_id == channel_id and reaction.message_id == message_id:
+                    if reaction.emoji.name in self.accepted_reactions:
+                        position = Positions.get_position(reaction.emoji.name)
+                        guild = self.get_guild(guild_id)
+                        member = guild.get_member(reaction.user_id)
+
+                        if position == self.clash.players[name][member.name]:
+                            role = guild.get_role(role_id)
+                            await member.remove_roles(role)
+                            self.clash.unregister_player(name, member.name)
+                        break
 
         @self.command()
         async def mundo(ctx: Context, num=1):
@@ -134,6 +154,8 @@ class MundoBot(commands.Bot):
             message = await clash_channel.send("@everyone Nábor na clash " + name + "\n"
                                         "Pokud si můžete a chcete si zahrát tak zareagujete svojí rolí nebo fill rolí.",
                                         allowed_mentions=discord.AllowedMentions.all())
+
+            self.clash.players[name] = {}
 
             # Give access to new channel to everyone above or equal to requesting user + new designated role
             overwrites = {}
@@ -249,6 +271,8 @@ class MundoBot(commands.Bot):
 if __name__ == "__main__":
     bot = MundoBot()
     bot.start_running()
+
+
 
 '''
 bot = commands.Bot(command_prefix='!')
