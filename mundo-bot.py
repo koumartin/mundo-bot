@@ -28,22 +28,9 @@ handling_mundo_queue: Dict[discord.Guild, Tuple[bool, bool]] = {}
 async def on_ready():
     global clash
     clash = ClashManager(path)
-    await check_expired_clashes(clash)
+    await check_expired_clashes()
 
     print("Logged in.")
-
-
-async def check_expired_clashes(clash):
-    expired = clash.check_clashes()
-    for name, date in expired.items():
-        for guild in bot.guilds:
-            role_name = name + " Player"
-            roles = (r for r in guild.roles if r.name == role_name)
-            for r in roles:
-                await r.delete()
-            channels = (c for c in guild.channels if c.name == name.replace(" ", "-").lower())
-            for c in channels:
-                await c.delete()
 
 
 @bot.event
@@ -113,18 +100,29 @@ async def shutup(ctx: Context, additional=""):
 
 @bot.command()
 async def add_clash(ctx: Context, name: str, date: str):
+    global clash
     await conditional_delete(ctx.message)
 
-    if ctx.author.name != "KoudyCZ":
+    if not (ctx.author.guild_permissions.manage_roles and ctx.author.guild_permissions.manage_channels):
+        await ctx.author.send("Mundo no do work for lowlife like you. Get more permissions.(manage channels and roles)")
         return
-    clash.add_clash(name, date)
 
+    # Sends message to designated channel
+    clash_channel = next((c for c in ctx.guild.text_channels if c.name == "clash"), None)
+    if clash_channel is None:
+        await ctx.author.send("Mundo need clash text channel.")
+        return
+    message = await clash_channel.send("@everyone Nábor na clash " + name + "\n"
+                                      "Pokud si můžete a chcete si zahrát tak zareagujete svojí rolí nebo fill rolí.",
+                                       allowed_mentions=discord.AllowedMentions.all())
 
+    # Give access to new channel to everyone above or equal to requesting user + new designated role
     overwrites = {}
     author_role = max(ctx.author.roles)
     for r in ctx.guild.roles:
-        overwrites[r] = discord.PermissionOverwrite(read_messages = r >= author_role)
+        overwrites[r] = discord.PermissionOverwrite(read_messages=(r >= author_role))
 
+    # Check if role with desired name already exists, else create it and give it permissions to channel
     role_name = name + " Player"
     role = next((r for r in ctx.guild.roles if r.name == role_name), None)
     if role is None:
@@ -132,15 +130,42 @@ async def add_clash(ctx: Context, name: str, date: str):
                                                          permissions=ctx.guild.default_role.permissions)
         overwrites[role] = discord.PermissionOverwrite(read_messages=True)
 
-    category = next((c for c in ctx.guild.categories if c.name == "Clash"))
+    # Channel will be placed to category named Clash, else to no category
+    category = next((c for c in ctx.guild.categories if c.name == "Clash"), None)
+
+    # Create new channel only if no channel of such name currently exists
     channel = next((c for c in ctx.guild.channels if c.name == name.replace(" ", "-").lower()), None)
     if channel is None:
-        await ctx.guild.create_text_channel(name, overwrites=overwrites, category=category)
+        channel: discord.TextChannel = await ctx.guild.create_text_channel(name, overwrites=overwrites, category=category)
+
+    # Add all this to clash manager for saving
+    clash.add_clash(name, date, ctx.guild.id, clash_channel.id, message.id)
 
 
 # -----------------------------------------------------
 # Additional non Discord API functions for cleaner code
 # -----------------------------------------------------
+async def check_expired_clashes():
+    global clash
+    expired = clash.check_clashes()
+    for name, (guild_id, channel_id, message_id, date) in expired.items():
+        guild = bot.get_guild(guild_id)
+
+        # Delete role and channel
+        role_name = name + " Player"
+        roles = (r for r in guild.roles if r.name == role_name)
+        for r in roles:
+            await r.delete()
+        channels = (c for c in guild.text_channels if c.name == name.replace(" ", "-").lower())
+        for c in channels:
+            await c.delete()
+
+        # Delete original message
+        channel = guild.get_channel(channel_id)
+        message = await channel.fetch_message(message_id)
+        await message.delete()
+
+
 async def add_to_queue(guild: discord.Guild, channel: discord.VoiceChannel, num=1):
     global handling_mundo_queue, mundo_queue
     if guild not in mundo_queue:
