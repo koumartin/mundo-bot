@@ -1,4 +1,4 @@
-# MundoBot
+# MundoBot 1.0
 
 Little annoying Discord bot that likes to greet people.
 
