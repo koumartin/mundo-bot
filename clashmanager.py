@@ -6,20 +6,13 @@ from typing import Dict, Tuple
 from positions import Positions
 
 
-def serialize(obj):
-    if isinstance(obj, Positions):
-        return str(obj)
-    if isinstance(obj, datetime.date):
-        return str(obj)
-    if isinstance(obj, Clash):
-        return serialize(obj.__dict__.items())
-    return str(obj)
-
-
 class Clash:
     def __init__(self, name: str, date: str, guild_id: int, channel_id: int, message_id: int, role_id: int, status_id: int):
         self.name = name
-        self.date = datetime.datetime.strptime(date, "%d.%m.%y").date()
+        try:
+            self.date = datetime.datetime.strptime(date, "%d.%m.%y").date()
+        except ValueError:
+            self.date = datetime.datetime.fromisoformat(date).date()
         self.guild_id = guild_id
         self.channel_id = channel_id
         self.message_id = message_id
@@ -40,11 +33,11 @@ class ClashManager:
             try:
                 json_dict: Dict = json.load(f)
                 if len(json_dict) > 0:
-                    for name, (date_str, guild, channel, message, role_id, status_id) in json_dict.items():
-                        c = Clash(name, date_str, guild, channel, message, role_id, status_id)
+                    for (name, date_str, guild, channel, message, role, status) in json_dict.values():
+                        c = Clash(name, date_str, guild, channel, message, role, status)
                         self.clashes[name] = c
-            except:
-                print("Ex")
+            except Exception as e:
+                print(e)
                 pass
 
     def check_clashes(self) -> Dict[str, Clash]:
@@ -63,7 +56,11 @@ class ClashManager:
     def dump_to_json(self, clash_flag=False, player_flag=False):
         if clash_flag:
             with open(os.path.join(self.path, "clash/clash.json"), "w") as f:
-                json.dump(self.clashes, f, indent=4, default=serialize)
+                dump_dict = {}
+                for name, clash in self.clashes.items():
+                    dump_dict[name] = list(clash.__dict__.values())
+
+                json.dump(dump_dict, f, indent=4, default=serialize)
         if player_flag:
             with open(os.path.join(self.path, "clash/players.json"), "w") as f:
                 json.dump(self.players, f, indent=4, default=serialize)
@@ -85,3 +82,9 @@ class ClashManager:
         self.dump_to_json(player_flag=True)
 
 
+def serialize(obj):
+    if isinstance(obj, Positions):
+        return str(obj)
+    if isinstance(obj, datetime.date):
+        return str(obj)
+    return str(obj)
