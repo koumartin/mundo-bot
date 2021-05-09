@@ -3,7 +3,7 @@ import asyncio
 import queue
 import os
 from clashmanager import ClashManager, Clash
-from positions import Positions
+from position import Position
 from discord.ext import commands
 from discord.ext.commands.context import Context as Context
 from typing import Dict, Tuple
@@ -30,13 +30,15 @@ class MundoBot(commands.Bot):
 
         self.clash_manager: ClashManager = ClashManager(self.path)
         self.add_all_commands()
-        self.accepted_reactions = Positions.accepted_reactions()
+        self.accepted_reactions = Position.accepted_reactions()
 
     def start_running(self):
         self.run(self.TOKEN)
 
-    # Gives bot all events and commands
     def add_all_commands(self):
+        # -----------------------------------------------------
+        # DISCORD API EVENTS
+        # -----------------------------------------------------
         @self.event
         async def on_ready():
             await self.check_expired_clashes()
@@ -57,37 +59,62 @@ class MundoBot(commands.Bot):
         @self.event
         async def on_raw_reaction_add(reaction: discord.RawReactionActionEvent):
             clash: Clash
-            for clash in self.clash_manager.clashes:
-                if reaction.guild_id == clash.guild_id and reaction.channel_id == clash.channel_id and reaction.message_id == clash.message_id:
-                    if reaction.emoji.name in self.accepted_reactions:
-                        guild = self.get_guild(clash.guild_id)
-                        position = Positions.get_position(reaction.emoji.name)
-                        role = guild.get_role(clash.role_id)
-                        if position != Positions.NOOB:
-                            await reaction.member.add_roles(role)
-                        self.clash_manager.register_player(clash.name, reaction.member.name, position)
+            # Checks if reaction was made on one of initial messages
+            for clash in self.clash_manager.clashes.values():
+                if reaction.guild_id == clash.guild_id and reaction.channel_id == clash.clash_channel_id and \
+                        reaction.message_id == clash.message_id and reaction.emoji.name in self.accepted_reactions:
+                    # Gets guild, position and role for this clash
+                    guild = self.get_guild(clash.guild_id)
+                    position = Position.get_position(reaction.emoji.name)
+                    role = guild.get_role(clash.role_id)
 
-                        break
+                    # If member is already in players for this clash, remove his reaction, send him message and ignore
+                    if reaction.member.name in self.clash_manager.players[clash.name]:
+                        channel = guild.get_channel(reaction.channel_id)
+                        message = await channel.fetch_message(reaction.message_id)
+                        await message.remove_reaction(reaction.emoji, reaction.member)
+                        await reaction.member.send("Only one position per player dummy.")
+                        return
 
-            # TODO: Keep track of players in the clash
-            # TODO: Updating message at the start of channel telling who is playing
+                    # NOOB doesn't get player role and access to channel
+                    if position != Position.NOOB:
+                        await reaction.member.add_roles(role)
+
+                    self.clash_manager.register_player(clash.name, reaction.member.name, position)
+
+                    # Update message in this clash channel
+                    channel = guild.get_channel(clash.channel_id)
+                    status_message: discord.Message = await channel.fetch_message(clash.status_id)
+                    await status_message.edit(content=self.show_players(self.clash_manager.players[clash.name]))
+                    break
 
         @self.event
         async def on_raw_reaction_remove(reaction: discord.RawReactionActionEvent):
             clash: Clash
-            for clash in self.clash_manager.clashes:
-                if reaction.guild_id == clash.guild_id and reaction.channel_id == clash.channel_id and reaction.message_id == clash.message_id:
-                    if reaction.emoji.name in self.accepted_reactions:
-                        position = Positions.get_position(reaction.emoji.name)
-                        guild = self.get_guild(clash.guild_id)
-                        member = guild.get_member(reaction.user_id)
+            # Checks if reaction was made on one of initial messages
+            for clash in self.clash_manager.clashes.values():
+                if reaction.guild_id == clash.guild_id and reaction.channel_id == clash.clash_channel_id and \
+                        reaction.message_id == clash.message_id and reaction.emoji.name in self.accepted_reactions:
+                    # Gets guild, position and role for this clash
+                    position = Position.get_position(reaction.emoji.name)
+                    guild = self.get_guild(clash.guild_id)
+                    member = guild.get_member(reaction.user_id)
 
-                        if position == self.clash_manager.players[clash.name][member.name]:
-                            role = guild.get_role(clash.role_id)
-                            await member.remove_roles(role)
-                            self.clash_manager.unregister_player(clash.name, member.name)
-                        break
+                    # If player had this position remove hem from player and role
+                    if position == self.clash_manager.players[clash.name][member.name]:
+                        role = guild.get_role(clash.role_id)
+                        await member.remove_roles(role)
+                        self.clash_manager.unregister_player(clash.name, member.name)
 
+                        # Update message in this clash channel
+                        channel = guild.get_channel(clash.channel_id)
+                        status_message: discord.Message = await channel.fetch_message(clash.status_id)
+                        await status_message.edit(content=self.show_players(self.clash_manager.players[clash.name]))
+                    break
+
+        # -----------------------------------------------------
+        # MUNDO GREET COMMANDS
+        # -----------------------------------------------------
         @self.command()
         async def mundo(ctx: Context, num=1):
             # Guard for receiving command from DMChannel
@@ -118,15 +145,14 @@ class MundoBot(commands.Bot):
 
         @self.command()
         async def shutup(ctx: Context, additional=""):
-            guild = ctx.guild
-
-            voice_client = discord.utils.get(self.voice_clients, guild=guild)
-
             await self.conditional_delete(ctx.message)
+
+            guild = ctx.guild
+            voice_client = discord.utils.get(self.voice_clients, guild=guild)
 
             print(ctx.author, "called !shutup in", ctx.guild)
 
-            # Remake
+            # TODO: REDO WITH PERMISSIONS
             if ctx.author.name != "KoudyCZ" and ctx.author.name != "adjalS" \
                     and additional.lower() != "please" and additional.lower() != "prosím":
                 await ctx.author.send("You no tell Mundo what Mundo do!!!")
@@ -139,25 +165,27 @@ class MundoBot(commands.Bot):
                 self.handling_mundo_queue[guild] = (True, True)
                 self.mundo_queue[guild] = queue.Queue()
 
+        # -----------------------------------------------------
+        # CLASH COMMANDS
+        # -----------------------------------------------------
         @self.command()
-        async def add_clash(ctx: Context, name: str, date: str):
+        async def add_clash(ctx: Context, clash_name: str, date: str):
             await self.conditional_delete(ctx.message)
 
+            # Check caller permissions
             if not (ctx.author.guild_permissions.manage_roles and ctx.author.guild_permissions.manage_channels):
                 await ctx.author.send(
                     "Mundo no do work for lowlife like you. Get more permissions.(manage channels and roles)")
                 return
 
-            # Sends message to designated channel
+            # Sends message to designated channel and also gets clash_channel
             clash_channel = next((c for c in ctx.guild.text_channels if c.name == "clash"), None)
             if clash_channel is None:
                 await ctx.author.send("Mundo need clash text channel.")
                 return
-            message = await clash_channel.send("@everyone Nábor na clash " + name + "\n"
-                                        "Pokud si můžete a chcete si zahrát tak zareagujete svojí rolí nebo fill rolí.",
-                                        allowed_mentions=discord.AllowedMentions.all())
-
-            self.clash_manager.players[name] = {}
+            message = await clash_channel.send("@everyone Nábor na clash " + clash_name + " - " + date + "\n"
+                                "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí nebo fill rolí, případně"
+                                 " :thumbdown: pokud nemůžete.", allowed_mentions=discord.AllowedMentions.all())
 
             # Give access to new channel to everyone above or equal to requesting user + new designated role
             overwrites = {}
@@ -165,8 +193,8 @@ class MundoBot(commands.Bot):
             for r in ctx.guild.roles:
                 overwrites[r] = discord.PermissionOverwrite(read_messages=(r >= author_role))
 
-            # Check if role with desired name already exists, else create it and give it permissions to channel
-            role_name = name + " Player"
+            # Check if role with desired clash_name already exists, else create it and give it permissions to channel
+            role_name = clash_name + " Player"
             role = next((r for r in ctx.guild.roles if r.name == role_name), None)
             if role is None:
                 role: discord.Role = await ctx.guild.create_role(name=role_name,
@@ -177,70 +205,127 @@ class MundoBot(commands.Bot):
             category = next((c for c in ctx.guild.categories if c.name == "Clash"), None)
 
             # Create new channel only if no channel of such name currently exists
-            channel = next((c for c in ctx.guild.channels if c.name == name.replace(" ", "-").lower()), None)
+            channel = next((c for c in ctx.guild.channels if c.name == clash_name.replace(" ", "-").lower()), None)
             if channel is None:
-                await ctx.guild.create_text_channel(name, overwrites=overwrites, category=category)
+                channel = await ctx.guild.create_text_channel(clash_name, overwrites=overwrites, category=category)
+
+            # Add players dictionary to clash_manager
+            self.clash_manager.players[clash_name] = {}
 
             # Add message to channel and pin it
-            status = await channel.send("Aktuální sestava\nTOP:\nJUNG:\nMID:\nADC:\nSUPP:")
+            status = await channel.send(self.show_players(self.clash_manager.players[clash_name]))
             await status.pin()
 
-            clash = Clash(name, date, ctx.guild.id, clash_channel.id, message.id, role.id, status.id)
+            # Create new Clash calss to hold all data about it and supporting structure
+            clash = Clash(clash_name, date, ctx.guild.id, clash_channel.id, channel.id, message.id, role.id, status.id)
 
             # Add all this to clash manager for saving
             self.clash_manager.add_clash(clash)
 
+        @self.command()
+        async def remove_clash(ctx: Context, clash_name: str):
+            await self.conditional_delete(ctx.message)
+
+            # Check caller permissions
+            if not (ctx.author.guild_permissions.manage_roles and ctx.author.guild_permissions.manage_channels):
+                await ctx.author.send("Mundo no do work for lowlife like you. Get more permissions."
+                                      "(manage channels and roles)")
+                return
+
+            clash: Clash = self.clash_manager.remove_clash(clash_name)
+            await self.delete_clash(clash)
+
     # -----------------------------------------------------
-    # Additional non Discord API functions for cleaner code
+    # HELPER FOR DELETING ALL CLASH BELONGINGS
+    # -----------------------------------------------------
+    async def delete_clash(self, clash: Clash):
+        guild = self.get_guild(clash.guild_id)
+        # Delete role and channel
+        role_name = clash.name + " Player"
+        roles = (r for r in guild.roles if r.name == role_name)
+        for r in roles:
+            await r.delete()
+        channels = (c for c in guild.text_channels if c.name == clash.name.replace(" ", "-").lower())
+        for c in channels:
+            await c.delete()
+        # Delete original message in general clash channel
+        channel = guild.get_channel(clash.clash_channel_id)
+        message = await channel.fetch_message(clash.message_id)
+        await message.delete()
+
+    # -----------------------------------------------------
+    # METHODS FOR CREATING STRING OF CURRENTLY REGISTERED PLAYERS FOR GIVEN CLASH
+    # -----------------------------------------------------
+    def show_players(self, players) -> str:
+        output = "Aktuální sestava\n"
+        for position in Position:
+            output += str(position) + ": " + self.find_player(position, players) + "\n"
+        return output
+
+    @staticmethod
+    def find_player(target: Position, players: Dict[str, Position]) -> str:
+        output = ""
+        for player, position in players.items():
+            if position == target:
+                output += player + " "
+        return output
+
+    # -----------------------------------------------------
+    # CLASH CONSISTENCY CHECKS TO BE RUN AT THE LOGIN
     # -----------------------------------------------------
     async def check_expired_clashes(self):
         clash: Clash
 
+        print("Checking expired clashes")
+
+        # Gets expired clashes from clash_manager
         expired = self.clash_manager.check_clashes()
-        for clash in expired:
-            guild = self.get_guild(clash.guild_id)
-
-            # Delete role and channel
-            role_name = clash.name + " Player"
-            roles = (r for r in guild.roles if r.name == role_name)
-            for r in roles:
-                await r.delete()
-
-            channels = (c for c in guild.text_channels if c.name == clash.name.replace(" ", "-").lower())
-            for c in channels:
-                await c.delete()
-
-            # Delete original message in general clash channel
-            channel = guild.get_channel(clash.channel_id)
-            message = await channel.fetch_message(clash.message_id)
-            await message.delete()
+        for clash in expired.values():
+            await self.delete_clash(clash)
 
     async def check_positions(self):
         clash: Clash
 
-        for (clash) in self.clash_manager.clashes:
+        print("Checking player positions")
+
+        for clash in self.clash_manager.clashes.values():
+            # Finds guild, its clash_channel and initial message
             self.clash_manager.players[clash.name] = {}
             guild = self.get_guild(clash.guild_id)
-            channel = guild.get_channel(clash.channel_id)
+            channel = guild.get_channel(clash.clash_channel_id)
             message: discord.Message = await channel.fetch_message(clash.message_id)
+
+            # Checks reactions and adds users to players dictionary
             for reaction in message.reactions:
-                users = await reaction.users().flatten()
-                for user in users:
+                for user in await reaction.users().flatten():
+                    # Delete all other reactions if user already is in players dictionary for this clash
                     if user.name in self.clash_manager.players[clash.name]:
                         await self.remove_reactions(user, message, self.clash_manager.players[clash.name][user.name])
+                        await user.send("Only one position per player dummy.")
                     else:
-                        position = Positions.get_position(reaction.emoji.name)
+                        if isinstance(reaction.emoji, str):
+                            emoji_name = reaction.emoji
+                        else:
+                            emoji_name = reaction.emoji.name
+                        position = Position.get_position(emoji_name)
                         self.clash_manager.register_player(clash.name, user.name, position)
 
     @staticmethod
-    async def remove_reactions(user, message: discord.Message, pos: Positions):
+    async def remove_reactions(user, message: discord.Message, pos: Position):
         for reaction in message.reactions:
-            if Positions.get_position(reaction.emoji.name) != pos:
+            if isinstance(reaction.emoji, str):
+                emoji_name = reaction.emoji
+            else:
+                emoji_name = reaction.emoji.name
+            if Position.get_position(emoji_name) != pos:
                 users = await reaction.users().flatten()
                 for u in users:
                     if u == user:
                         await message.remove_reaction(reaction.emoji, user)
 
+    # -----------------------------------------------------
+    # MUNDO GREET ADDITIONAL METHODS
+    # -----------------------------------------------------
     async def add_to_queue(self, guild: discord.Guild, channel: discord.VoiceChannel, num=1):
         if guild not in self.mundo_queue:
             self.mundo_queue[guild] = queue.Queue()
@@ -299,11 +384,18 @@ class MundoBot(commands.Bot):
         audio_path = os.path.join(self.path, file_name)
         voice_client.play(discord.FFmpegPCMAudio(audio_path))
 
-    async def conditional_delete(self, message: discord.Message):
+    # -----------------------------------------------------
+    # CONDITIONAL DELETE
+    # -----------------------------------------------------
+    @staticmethod
+    async def conditional_delete(message: discord.Message):
         if isinstance(message.channel, discord.TextChannel):
             await message.delete()
 
 
+# -----------------------------------------------------
+# MAIN
+# -----------------------------------------------------
 if __name__ == "__main__":
     bot = MundoBot()
     bot.start_running()
