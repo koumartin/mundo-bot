@@ -1,12 +1,14 @@
-import discord
 import asyncio
-import queue
 import os
-from clashmanager import ClashManager, Clash
-from position import Position
+import queue
+from typing import Dict, Tuple
+
+import discord
 from discord.ext import commands
 from discord.ext.commands.context import Context as Context
-from typing import Dict, Tuple
+
+from clashmanager import Clash, ClashManager
+from position import Position
 
 # -------------------------------------------
 # ADDITIONAL INFORMATION:
@@ -368,9 +370,9 @@ class MundoBot(commands.Bot):
 
             if i >= 5:
                 i = 0
-                await self.play_mundo_sound(voice_client, "assets/mundo-say-name-often.mp3")
+                await self.play_mundo_sound(voice_client, "../assets/mundo-say-name-often.mp3")
             else:
-                await self.play_mundo_sound(voice_client, "assets/muundo.mp3")
+                await self.play_mundo_sound(voice_client, "../assets/muundo.mp3")
 
             while voice_client.is_playing():
                 # Not clean but it iiiis what it iiiis

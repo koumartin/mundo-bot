@@ -31,7 +31,7 @@ class ClashManager:
         self.path = path
         self.clashes = {}
         self.players = {}
-        with open(os.path.join(self.path, "clash/clash.json"), "r") as f:
+        with open(os.path.join(self.path, "../clash/clash.json"), "r") as f:
             try:
                 json_dict: Dict = json.load(f)
                 if len(json_dict) > 0:
@@ -59,7 +59,7 @@ class ClashManager:
 
     def dump_to_json(self, clash_flag=False, player_flag=False):
         if clash_flag:
-            with open(os.path.join(self.path, "clash/clash.json"), "w") as f:
+            with open(os.path.join(self.path, "../clash/clash.json"), "w") as f:
                 dump_dict = {}
                 for name, clash in self.clashes.items():
                     dump_dict[name] = list(clash.__dict__.values())
