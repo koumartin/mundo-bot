@@ -3,9 +3,13 @@ import os
 import queue
 from typing import Dict, Tuple
 
+import dotenv
+
 import discord
 from discord.ext import commands
 from discord.ext.commands.context import Context as Context
+
+from pymongo import MongoClient
 
 from mundobot.clashmanager import Clash, ClashManager
 from mundobot.position import Position
@@ -18,11 +22,11 @@ from mundobot.position import Position
 
 
 class MundoBot(commands.Bot):
-    def __init__(self):
+    def __init__(self, token):
         intents = discord.Intents.default()
         intents.members = True
         commands.Bot.__init__(self, command_prefix='!', intents=intents)
-        self.TOKEN = "ODIyNTk0ODA1NDI2NDIxNzgx.YFUjHA.tZddNbtLM_7o0KQh_SWXb8U7M-Y"
+        self.TOKEN = token
         self.path = os.path.dirname(os.path.abspath(__file__))
 
         # Create global variables
@@ -399,5 +403,7 @@ class MundoBot(commands.Bot):
 # MAIN
 # -----------------------------------------------------
 if __name__ == "__main__":
-    bot = MundoBot()
+    dotenv.load_dotenv()
+
+    bot = MundoBot(os.environ.get("botToken"))
     bot.start_running()
