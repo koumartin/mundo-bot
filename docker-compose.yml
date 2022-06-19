@@ -22,6 +22,8 @@ services:
   mundobot:
     image: mundobot
     container_name: mundobot
+    environment:
+      - DOCKER=true
     networks:
       - mongodb_network
     restart: unless-stopped
