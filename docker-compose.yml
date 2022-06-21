@@ -26,6 +26,7 @@ services:
       - DOCKER=true
     networks:
       - mongodb_network
+    build: mundobot_env/mundobot
     restart: unless-stopped
 
   mongo-express:
