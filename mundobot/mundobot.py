@@ -39,7 +39,8 @@ class MundoBot(commands.Bot):
             token (str): Discord api bot token.
             mongodbConnectionString (str): Connection string to mongodb.
         """
-        intents: dc.Intents = dc.Intents.all()
+        intents: dc.Intents = dc.Intents.default()
+        intents.members = True
         commands.Bot.__init__(self, command_prefix="!", intents=intents)
 
         self.token = token
