@@ -4,7 +4,7 @@ Mundo bot class and commands for running it.
 import asyncio
 import os
 import queue
-from typing import Dict, Tuple, Iterable
+from typing import Dict, Tuple
 from urllib.parse import quote_plus
 from dacite import from_dict
 
@@ -51,9 +51,9 @@ class MundoBot(commands.Bot):
         self.path = os.path.dirname(os.path.abspath(__file__))
 
         # Create global variables
-        self.mundo_queue: Dict[dc.Guild, queue.Queue] = {}
+        self.playback_queue: Dict[dc.Guild, queue.Queue] = {}
         # Value is tuple of (handling, stop)
-        self.handling_mundo_queue: Dict[dc.Guild, Tuple[bool, bool]] = {}
+        self.playback_queue_handle: Dict[dc.Guild, Tuple[bool, bool]] = {}
 
         self.client = MongoClient(mongodbConnectionString)
         self.clash_manager: ClashManager = ClashManager(self.client)
@@ -72,8 +72,8 @@ class MundoBot(commands.Bot):
         # -----------------------------------------------------
         @self.event
         async def on_ready() -> None:
-            await self.check_expired_clashes()
-            await self.check_positions()
+            # await self.check_expired_clashes()
+            # await self.check_positions()
             print("Logged in.")
 
         @self.event
@@ -138,7 +138,7 @@ class MundoBot(commands.Bot):
                 if position != Position.NOOB:
                     await reaction.member.add_roles(role)
 
-                self.clash_manager.register_player(
+                new_positions = self.clash_manager.register_player(
                     clash_id, reaction.member.name, position
                 )
 
@@ -147,11 +147,7 @@ class MundoBot(commands.Bot):
                 status_message: dc.Message = await channel.fetch_message(
                     clash.status_id
                 )
-                await status_message.edit(
-                    content=self.show_players(
-                        self.clash_manager.players_for_clash(clash_id)
-                    )
-                )
+                await status_message.edit(content=self.show_players(new_positions))
                 break
 
         @self.event
@@ -162,37 +158,39 @@ class MundoBot(commands.Bot):
             Args:
                 reaction (dc.RawReactionActionEvent): Event of removing reaction.
             """
-            clash: Clash
             # Checks if reaction was made on one of initial messages
-            for clash in self.clash_manager.clashes.values():
+            for clash_entry in self.clash_manager.clashes_for_guild(reaction.guild_id):
+                clash: Clash = from_dict(Clash, clash_entry)
                 if (
-                    reaction.guild_id == clash.guild_id
-                    and reaction.channel_id == clash.clash_channel_id
-                    and reaction.message_id == clash.message_id
-                    and reaction.emoji.name in self.accepted_reactions
+                    reaction.channel_id != clash.clash_channel_id
+                    or reaction.message_id != clash.message_id
+                    or reaction.emoji.name not in self.accepted_reactions
                 ):
-                    # Gets guild, position and role for this clash
-                    position = Position.get_position(reaction.emoji.name)
-                    guild = self.get_guild(clash.guild_id)
-                    member = guild.get_member(reaction.user_id)
+                    continue
 
-                    # If player had this position remove hem from player and role
-                    if position == self.clash_manager.players[clash.name][member.name]:
-                        role = guild.get_role(clash.role_id)
-                        await member.remove_roles(role)
-                        self.clash_manager.unregister_player(clash.name, member.name)
+                clash_id: int = clash_entry["_id"]
+                guild: dc.Guild = self.get_guild(clash.guild_id)
+                position = Position.get_position(reaction.emoji.name)
+                member: dc.Member = guild.get_member(reaction.user_id)
+                role: dc.Role = guild.get_role(clash.role_id)
 
-                        # Update message in this clash channel
-                        channel = guild.get_channel(clash.channel_id)
-                        status_message: dc.Message = await channel.fetch_message(
-                            clash.status_id
-                        )
-                        await status_message.edit(
-                            content=self.show_players(
-                                self.clash_manager.players[clash.name]
-                            )
-                        )
-                    break
+                # If player had this position remove them from player and role
+                if position == self.clash_manager.role_for_player(
+                    clash_id, member.name
+                ):
+                    role = guild.get_role(clash.role_id)
+                    await member.remove_roles(role)
+                    new_positions = self.clash_manager.unregister_player(
+                        clash_id, member.name
+                    )
+
+                    # Update message in this clash channel
+                    channel = guild.get_channel(clash.channel_id)
+                    status_message: dc.Message = await channel.fetch_message(
+                        clash.status_id
+                    )
+                    await status_message.edit(content=self.show_players(new_positions))
+                break
 
         # -----------------------------------------------------
         # MUNDO GREET COMMANDS
@@ -268,8 +266,8 @@ class MundoBot(commands.Bot):
                 )
                 if voice_client is not None:
                     voice_client.stop()
-                self.handling_mundo_queue[guild] = (True, True)
-                self.mundo_queue[guild] = queue.Queue()
+                self.playback_queue_handle[guild] = (True, True)
+                self.playback_queue[guild] = queue.Queue()
 
         # -----------------------------------------------------
         # CLASH COMMANDS
@@ -306,8 +304,9 @@ class MundoBot(commands.Bot):
                 await ctx.author.send("Mundo need clash text channel.")
                 return
             message = await clash_channel.send(
-                f"@everyone Nábor na clash {clash_name} - {date}\n"
-                "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí nebo fill rolí, případně :thumbdown: pokud nemůžete.",
+                f"@everyone Nábor na clash {clash_name} - {date}\n",
+                "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí"
+                + " nebo fill rolí, případně :thumbdown: pokud nemůžete.",
                 allowed_mentions=dc.AllowedMentions.all(),
             )
 
@@ -459,58 +458,6 @@ class MundoBot(commands.Bot):
                 output += player + " "
         return output
 
-    # -----------------------------------------------------
-    # CLASH CONSISTENCY CHECKS TO BE RUN AT THE LOGIN
-    # -----------------------------------------------------
-    async def check_expired_clashes(self) -> None:
-        """Checks if any clasches are expired and removes them.
-        WILL BECOME DEPRECATED.
-        """
-        clash: Clash
-
-        print("Checking expired clashes")
-
-        # Gets expired clashes from clash_manager
-        expired = self.clash_manager.check_clashes()
-        for clash in expired.values():
-            await self.delete_clash(clash)
-
-    async def check_positions(self) -> None:
-        """Checks if positions of players in the clash match positions stored in ClashManager."""
-        clash: Clash
-
-        print("Checking player positions")
-        return
-
-        for clash in self.clash_manager.clashes.values():
-            # Finds guild, its clash_channel and initial message
-            self.clash_manager.players[clash.name] = {}
-            guild = self.get_guild(clash.guild_id)
-            channel = guild.get_channel(clash.clash_channel_id)
-            message: dc.Message = await channel.fetch_message(clash.message_id)
-
-            # Checks reactions and adds users to players dictionary
-            for reaction in message.reactions:
-                for user in await reaction.users().flatten():
-                    # Delete all other reactions if user already is in players dictionary
-                    # for this clash
-                    if user.name in self.clash_manager.players[clash.name]:
-                        await self.remove_reactions(
-                            user,
-                            message,
-                            self.clash_manager.players[clash.name][user.name],
-                        )
-                        await user.send("Only one position per player dummy.")
-                    else:
-                        if isinstance(reaction.emoji, str):
-                            emoji_name = reaction.emoji
-                        else:
-                            emoji_name = reaction.emoji.name
-                        position = Position.get_position(emoji_name)
-                        self.clash_manager.register_player(
-                            clash.name, user.name, position
-                        )
-
     @staticmethod
     async def remove_reactions(
         user: dc.Member | dc.User, message: dc.Message, pos: Position
@@ -546,18 +493,18 @@ class MundoBot(commands.Bot):
             channel (dc.VoiceChannel): The channel in which to play sound.
             num (int, optional): Number of times the sound is played. Defaults to 1.
         """
-        if guild not in self.mundo_queue:
-            self.mundo_queue[guild] = queue.Queue()
+        if guild not in self.playback_queue:
+            self.playback_queue[guild] = queue.Queue()
 
         # Put channel to a music queue
         for _ in range(num):
-            self.mundo_queue[guild].put(channel)
+            self.playback_queue[guild].put(channel)
 
-        if guild not in self.handling_mundo_queue:
-            self.handling_mundo_queue[guild] = (False, False)
+        if guild not in self.playback_queue_handle:
+            self.playback_queue_handle[guild] = (False, False)
 
         # If queue isn't already handled start handling it
-        if self.handling_mundo_queue[guild][0] is False:
+        if self.playback_queue_handle[guild][0] is False:
             await self.play_from_queue(guild)
 
     async def play_from_queue(self, guild: dc.Guild) -> None:
@@ -570,14 +517,14 @@ class MundoBot(commands.Bot):
         voice_client = dc.utils.get(self.voice_clients, guild=guild)
         i = 0
 
-        while not self.mundo_queue[guild].empty():
-            _, stop = self.handling_mundo_queue[guild]
+        while not self.playback_queue[guild].empty():
+            _, stop = self.playback_queue_handle[guild]
             if stop is True:
-                self.handling_mundo_queue[guild] = (False, False)
+                self.playback_queue_handle[guild] = (False, False)
                 return
             else:
-                self.handling_mundo_queue[guild] = (True, False)
-            channel = self.mundo_queue[guild].get()
+                self.playback_queue_handle[guild] = (True, False)
+            channel = self.playback_queue[guild].get()
             i += 1
 
             # In case bot isn't connected to a voice_channel yet
@@ -604,7 +551,7 @@ class MundoBot(commands.Bot):
 
         if voice_client.is_connected():
             await voice_client.disconnect()
-        self.handling_mundo_queue[guild] = (False, False)
+        self.playback_queue_handle[guild] = (False, False)
 
     async def play_mundo_sound(
         self, voice_client: dc.VoiceClient, file_name: str
@@ -654,3 +601,55 @@ if __name__ == "__main__":
 
     bot = MundoBot(bot_token, connection_string)
     bot.start_running()
+
+    # # -----------------------------------------------------
+    # # CLASH CONSISTENCY CHECKS TO BE RUN AT THE LOGIN
+    # # -----------------------------------------------------
+    # async def check_expired_clashes(self) -> None:
+    #     """Checks if any clasches are expired and removes them.
+    #     WILL BECOME DEPRECATED.
+    #     """
+    #     clash: Clash
+
+    #     print("Checking expired clashes")
+
+    #     # Gets expired clashes from clash_manager
+    #     expired = self.clash_manager.check_clashes()
+    #     for clash in expired.values():
+    #         await self.delete_clash(clash)
+
+    # async def check_positions(self) -> None:
+    #     """Checks if positions of players in the clash match positions stored in ClashManager."""
+    #     clash: Clash
+
+    #     print("Checking player positions")
+    #     return
+
+    #     for clash in self.clash_manager.clashes.values():
+    #         # Finds guild, its clash_channel and initial message
+    #         self.clash_manager.players[clash.name] = {}
+    #         guild = self.get_guild(clash.guild_id)
+    #         channel = guild.get_channel(clash.clash_channel_id)
+    #         message: dc.Message = await channel.fetch_message(clash.message_id)
+
+    #         # Checks reactions and adds users to players dictionary
+    #         for reaction in message.reactions:
+    #             for user in await reaction.users().flatten():
+    #                 # Delete all other reactions if user already is in players dictionary
+    #                 # for this clash
+    #                 if user.name in self.clash_manager.players[clash.name]:
+    #                     await self.remove_reactions(
+    #                         user,
+    #                         message,
+    #                         self.clash_manager.players[clash.name][user.name],
+    #                     )
+    #                     await user.send("Only one position per player dummy.")
+    #                 else:
+    #                     if isinstance(reaction.emoji, str):
+    #                         emoji_name = reaction.emoji
+    #                     else:
+    #                         emoji_name = reaction.emoji.name
+    #                     position = Position.get_position(emoji_name)
+    #                     self.clash_manager.register_player(
+    #                         clash.name, user.name, position
+    #                     )

@@ -1,11 +1,12 @@
 """Module providing classes of Clashmanager that manages stored Clashes."""
 import datetime
 from dataclasses import asdict
-from typing import Dict
+from typing import Any, Dict, List
 
 import pymongo
 import pymongo.cursor
 import pymongo.typings
+import pymongo.collection
 from dacite import from_dict
 
 from mundobot.clash import Clash
@@ -22,32 +23,22 @@ class ClashManager:
         self.clashes = client.clash.clashes
         self.positions = client.clash.positions
 
-    def check_clashes(self) -> Dict[str, Clash]:
-        """Finds all clashes that are expired and pops them from the dictionary.
+    def check_clashes(self) -> List[Clash]:
+        """Finds all clashes that are expired and pops them from the DB.
 
         Returns:
-            Dict[str, Clash]: Popped expired clashes.
+            List[Clash]: Popped expired clashes.
         """
 
-        for expired_clash in self.clashes.find(
+        expired_clashes: List[Clash] = []
+        for expired_clash_entry in self.clashes.find(
             {"date": {"$lt": datetime.datetime.today()}}
         ):
-            pass
+            expired_clashes.append(from_dict(Clash, expired_clash_entry))
+            self.clashes.delete_one({"_id": expired_clash_entry["_id"]})
+            self.positions.delete_one({"clash_id": expired_clash_entry["_id"]})
 
-        return {}
-        clash: Clash
-        curr_date = datetime.date.today()
-        popped = {}
-        for name, clash in self.clashes.items():
-            if curr_date > clash.date:
-                popped[name] = clash
-
-        for name in popped:
-            self.clashes.pop(name)
-            self.players.pop(name)
-
-        self.dump_to_json(clash_flag=True)
-        return popped
+        return expired_clashes
 
     def clashes_for_guild(self, guild_id: int) -> pymongo.cursor.Cursor:
         """Gets all clashes present for a given guild.
@@ -73,6 +64,22 @@ class ClashManager:
             {"clash_id": clash_id},
             projection={"players": True, "_id": False},
         )["players"]
+
+    def role_for_player(self, clash_id: int, player_name: str) -> Position | None:
+        """Gets the position of the player in given clash.
+
+        Args:
+            clash_id (int): Id of the clash.
+            player_name (str): Name of the player.
+
+        Returns:
+            Position | None: Position of the player or None if the player does not have position.
+        """
+        players_for_clash = self.players_for_clash(clash_id)
+        try:
+            return Position[players_for_clash[player_name]]
+        except KeyError:
+            return None
 
     def add_clash(self, clash: Clash) -> None:
         """Adds clash to list of clashes.
@@ -101,26 +108,38 @@ class ClashManager:
 
     def register_player(
         self, clash_id: int, player_name: str, team_role: Position
-    ) -> None:
+    ) -> Dict[str, Any]:
         """Adds player to its position in a clash.
+
         Args:
             clash_id (int): Id of the clash to which the player is added.
             player_name (str): Name of player to be added.
             team_role (Position): Position to which the player is added.
-        """
-        self.positions.find_one_and_update(
-            {"clash_id": clash_id}, {"$set": {f"players.{player_name}": team_role.name}}
-        )
 
-    def unregister_player(self, clash_name: str, player_name: str) -> None:
+        Returns:
+            Dict[str, Any]: Positions dictionary after modification.
+        """
+        return self.positions.find_one_and_update(
+            {"clash_id": clash_id},
+            {"$set": {f"players.{player_name}": team_role.name}},
+            return_document=pymongo.collection.ReturnDocument.AFTER,
+        )["players"]
+
+    def unregister_player(self, clash_id: str, player_name: str) -> Dict[str, Any]:
         """Unregisters player from clash.
 
         Args:
-            clash_name (str): Name of the clash from which to unregister.
+            clash_id (int): Id of the clash from which the player is removed.
             player_name (str): Name of the player.
+
+        Returns:
+            Dict[str, Any]: Positions dictionary after modification.
         """
-        self.players[clash_name].pop(player_name)
-        self.dump_to_json(player_flag=True)
+        return self.positions.find_one_and_update(
+            {"clash_id": clash_id},
+            {"$unset": {f"players.{player_name}": ""}},
+            return_document=pymongo.collection.ReturnDocument.AFTER,
+        )["players"]
 
 
 # def serialize(obj: object) -> str:
