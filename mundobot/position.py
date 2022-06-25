@@ -14,7 +14,7 @@ class Position(enum.Enum):
     BOT = ["adc", "bot", "bottom"]
     SUPPORT = ["sup", "supp", "support"]
     FILL = ["fill", "👍"]
-    NOOB = ["👎"]
+    NOOB = ["noob", "👎"]
 
     def __str__(self):
         return self.name

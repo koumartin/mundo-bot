@@ -4,8 +4,9 @@ Mundo bot class and commands for running it.
 import asyncio
 import os
 import queue
-from typing import Dict, Tuple
+from typing import Dict, Tuple, Iterable
 from urllib.parse import quote_plus
+from dacite import from_dict
 
 import discord as dc
 import dotenv
@@ -13,7 +14,8 @@ from discord.ext import commands
 from discord.ext.commands.context import Context
 from pymongo import MongoClient
 
-from mundobot.clashmanager import Clash, ClashManager
+from mundobot.clashmanager import ClashManager
+from mundobot.clash import Clash
 from mundobot.position import Position
 
 # -------------------------------------------
@@ -21,6 +23,8 @@ from mundobot.position import Position
 # Author: @koumartin
 # Date: 22/3/2021
 # -------------------------------------------
+
+
 class MundoBot(commands.Bot):
     """Discord bot for playnig sounds in rooms and mannaging clash.
 
@@ -40,7 +44,7 @@ class MundoBot(commands.Bot):
             mongodbConnectionString (str): Connection string to mongodb.
         """
         intents: dc.Intents = dc.Intents.default()
-        intents.members = True
+        intents.members = True  # pylint: disable=assigning-non-slot
         commands.Bot.__init__(self, command_prefix="!", intents=intents)
 
         self.token = token
@@ -51,11 +55,11 @@ class MundoBot(commands.Bot):
         # Value is tuple of (handling, stop)
         self.handling_mundo_queue: Dict[dc.Guild, Tuple[bool, bool]] = {}
 
-        self.clash_manager: ClashManager = ClashManager(self.path)
-        self.add_all_commands()
+        self.client = MongoClient(mongodbConnectionString)
+        self.clash_manager: ClashManager = ClashManager(self.client)
         self.accepted_reactions = Position.accepted_reactions()
 
-        self.client = MongoClient(mongodbConnectionString)
+        self.add_all_commands()
 
     def start_running(self) -> None:
         """Commands the bot to log in and start running using its api token."""
@@ -104,50 +108,51 @@ class MundoBot(commands.Bot):
             Args:
                 reaction (dc.RawReactionActionEvent): Event of adding reaction
             """
-            clash: Clash
             # Checks if reaction was made on one of initial messages
-            for clash in self.clash_manager.clashes.values():
+            for clash_entry in self.clash_manager.clashes_for_guild(reaction.guild_id):
+                clash: Clash = from_dict(Clash, clash_entry)
                 if (
-                    reaction.guild_id == clash.guild_id
-                    and reaction.channel_id == clash.clash_channel_id
-                    and reaction.message_id == clash.message_id
-                    and reaction.emoji.name in self.accepted_reactions
+                    reaction.channel_id != clash.clash_channel_id
+                    or reaction.message_id != clash.message_id
+                    or reaction.emoji.name not in self.accepted_reactions
                 ):
-                    # Gets guild, position and role for this clash
-                    guild = self.get_guild(clash.guild_id)
-                    position = Position.get_position(reaction.emoji.name)
-                    role = guild.get_role(clash.role_id)
+                    continue
 
-                    # If member is already in players for this clash,
-                    # than remove his reaction, send him message and ignore
-                    if reaction.member.name in self.clash_manager.players[clash.name]:
-                        channel = guild.get_channel(reaction.channel_id)
-                        message = await channel.fetch_message(reaction.message_id)
-                        await message.remove_reaction(reaction.emoji, reaction.member)
-                        await reaction.member.send(
-                            "Only one position per player dummy."
-                        )
-                        return
+                clash_id: int = clash_entry["_id"]
+                guild: dc.Guild = self.get_guild(clash.guild_id)
+                position = Position.get_position(reaction.emoji.name)
+                role: dc.Role = guild.get_role(clash.role_id)
 
-                    # NOOB doesn't get player role and access to channel
-                    if position != Position.NOOB:
-                        await reaction.member.add_roles(role)
+                # If member is already in players for this clash,
+                # than remove his reaction, send him message and ignore
+                if reaction.member.name in self.clash_manager.players_for_clash(
+                    clash_id
+                ):
+                    channel = guild.get_channel(reaction.channel_id)
+                    message = await channel.fetch_message(reaction.message_id)
+                    await message.remove_reaction(reaction.emoji, reaction.member)
+                    await reaction.member.send("Only one position per player dummy.")
+                    return
 
-                    self.clash_manager.register_player(
-                        clash.name, reaction.member.name, position
+                # NOOB doesn't get player role and access to channel
+                if position != Position.NOOB:
+                    await reaction.member.add_roles(role)
+
+                self.clash_manager.register_player(
+                    clash_id, reaction.member.name, position
+                )
+
+                # Update message in this clash channel
+                channel = guild.get_channel(clash.channel_id)
+                status_message: dc.Message = await channel.fetch_message(
+                    clash.status_id
+                )
+                await status_message.edit(
+                    content=self.show_players(
+                        self.clash_manager.players_for_clash(clash_id)
                     )
-
-                    # Update message in this clash channel
-                    channel = guild.get_channel(clash.channel_id)
-                    status_message: dc.Message = await channel.fetch_message(
-                        clash.status_id
-                    )
-                    await status_message.edit(
-                        content=self.show_players(
-                            self.clash_manager.players[clash.name]
-                        )
-                    )
-                    break
+                )
+                break
 
         @self.event
         async def on_raw_reaction_remove(reaction: dc.RawReactionActionEvent) -> None:
@@ -302,8 +307,7 @@ class MundoBot(commands.Bot):
                 return
             message = await clash_channel.send(
                 f"@everyone Nábor na clash {clash_name} - {date}\n"
-                "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí nebo fill rolí, \
-                    případně :thumbdown: pokud nemůžete.",
+                "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí nebo fill rolí, případně :thumbdown: pokud nemůžete.",
                 allowed_mentions=dc.AllowedMentions.all(),
             )
 
@@ -345,16 +349,11 @@ class MundoBot(commands.Bot):
                     clash_name, overwrites=overwrites, category=category
                 )
 
-            # Add players dictionary to clash_manager
-            self.clash_manager.players[clash_name] = {}
-
             # Add message to channel and pin it
-            status = await channel.send(
-                self.show_players(self.clash_manager.players[clash_name])
-            )
+            status = await channel.send(self.show_players(dict()))
             await status.pin()
 
-            # Create new Clash calss to hold all data about it and supporting structure
+            # Create new Clash object to hold all data about it and supporting structure
             clash = Clash(
                 clash_name,
                 date,
@@ -392,7 +391,7 @@ class MundoBot(commands.Bot):
                 )
                 return
 
-            clash: Clash = self.clash_manager.remove_clash(clash_name)
+            clash: Clash = self.clash_manager.remove_clash(clash_name, ctx.guild.id)
             await self.delete_clash(clash)
 
     # -----------------------------------------------------
@@ -425,18 +424,22 @@ class MundoBot(commands.Bot):
     # -----------------------------------------------------
     # METHODS FOR CREATING STRING OF CURRENTLY REGISTERED PLAYERS FOR GIVEN CLASH
     # -----------------------------------------------------
-    def show_players(self, players: Dict[str, Position]) -> str:
+    def show_players(self, players: Dict[str, str]) -> str:
         """Creates a string containing the registered team of players in a clash.
 
         Args:
-            players (Dict[str, Position]): Dictionary of players and theire role.
+            players (Dict[str, str]): Dictionary of players and theire role as string.
 
         Returns:
             str: Formatted string of players in a team.
         """
+        players_modified = dict(map(lambda x: (x[0], Position[x[1]]), players.items()))
+
         output = "Aktuální sestava\n"
         for position in Position:
-            output += f"{str(position)} : {self.find_players(position, players)}\n"
+            output += (
+                f"{str(position)} : {self.find_players(position, players_modified)}\n"
+            )
         return output
 
     @staticmethod
@@ -472,11 +475,12 @@ class MundoBot(commands.Bot):
         for clash in expired.values():
             await self.delete_clash(clash)
 
-    async def check_positions(self):
+    async def check_positions(self) -> None:
         """Checks if positions of players in the clash match positions stored in ClashManager."""
         clash: Clash
 
         print("Checking player positions")
+        return
 
         for clash in self.clash_manager.clashes.values():
             # Finds guild, its clash_channel and initial message
@@ -616,7 +620,7 @@ class MundoBot(commands.Bot):
 
     # -----------------------------------------------------
     # CONDITIONAL DELETE
-    # -----------------------------------------------------
+    # ----------------------------------------------------
     @staticmethod
     async def conditional_delete(message: dc.Message) -> None:
         """Deletes a message if it is in a TextChannel.
