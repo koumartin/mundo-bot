@@ -3,9 +3,10 @@
 FROM python:3.8-slim-buster
 
 WORKDIR /app
-COPY ./mundobot/requirements.txt requirements.txt
+COPY ./requirements.txt requirements.txt
 RUN pip3 install -r requirements.txt
-COPY ./mundobot .
+RUN apt-get install -y ffmpeg
+COPY . .
 
-CMD [ "python3", "-m", "mundo-bot.py" ]
+CMD [ "python3", "-m", "mundobot.mundobot" ]
 
