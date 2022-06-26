@@ -2,10 +2,13 @@
 Mundo bot class and commands for running it.
 """
 import asyncio
+from datetime import datetime, timedelta
 import os
 import queue
 from typing import Dict, Tuple
 from urllib.parse import quote_plus
+from uuid import UUID, getnode
+from bson import UuidRepresentation
 from dacite import from_dict
 
 import discord as dc
@@ -23,6 +26,9 @@ from mundobot.position import Position
 # Author: @koumartin
 # Date: 22/3/2021
 # -------------------------------------------
+
+LOCK_REFRESH_TIMEOUT = 3  # minutes
+LOCK_CHECK_TIMEOUT = 2.5 * 60  # 2.5 minutes
 
 
 class MundoBot(commands.Bot):
@@ -55,14 +61,21 @@ class MundoBot(commands.Bot):
         # Value is tuple of (handling, stop)
         self.playback_queue_handle: Dict[dc.Guild, Tuple[bool, bool]] = {}
 
-        self.client = MongoClient(mongodbConnectionString)
-        self.clash_manager: ClashManager = ClashManager(self.client)
+        self.client = MongoClient(
+            mongodbConnectionString, uuidRepresentation=UuidRepresentation.STANDARD
+        )
+        self.clash_manager = ClashManager(self.client)
         self.accepted_reactions = Position.accepted_reactions()
+
+        self.identifier: UUID = getnode()
+        self.is_singleton = False
+        self.singleton_collection = self.client.bot.singleton
 
         self.add_all_commands()
 
     def start_running(self) -> None:
         """Commands the bot to log in and start running using its api token."""
+        asyncio.get_event_loop().create_task(self.check_for_singleton())
         self.run(self.token)
 
     def add_all_commands(self) -> None:
@@ -564,6 +577,36 @@ class MundoBot(commands.Bot):
         """
         audio_path = os.path.join(self.path, file_name)
         voice_client.play(dc.FFmpegPCMAudio(audio_path))
+
+    async def check_for_singleton(self) -> None:
+        """Checks for singleton property in database.
+        Makes itself the singleton in case the old one is not refreshed.
+        Refreshes if currently being singleton.
+        """
+        current_value = self.singleton_collection.find_one()
+        if current_value.singleton_id == self.identifier:
+            print("Refreshing singleton lock")
+            self.singleton_collection.replace_one(
+                {"_id": current_value["_id"]},
+                {
+                    "$set": {
+                        "$valid_until": datetime.now()
+                        + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
+                    }
+                },
+            )
+        elif datetime.now() > current_value.valid_until:
+            self.singleton_collection.replace_one(
+                {"_id": current_value["_id"]},
+                {
+                    "$set": {
+                        "$valid_until": datetime.now()
+                        + timedelta(minutes=LOCK_REFRESH_TIMEOUT),
+                        "singleton_id": self.identifier,
+                    }
+                },
+            )
+        await asyncio.sleep(LOCK_CHECK_TIMEOUT)
 
     # -----------------------------------------------------
     # CONDITIONAL DELETE

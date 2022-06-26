@@ -21,4 +21,6 @@ class Clash:
         try:
             self.date = datetime.datetime.strptime(self.date_string, "%d.%m.%Y")
         except ValueError:
-            self.date = datetime.datetime.fromisoformat(self.date_string)
+            self.date = datetime.datetime.fromisoformat(self.date_string).replace(
+                hour=0, minute=0, second=0
+            )

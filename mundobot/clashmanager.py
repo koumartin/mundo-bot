@@ -3,10 +3,7 @@ import datetime
 from dataclasses import asdict
 from typing import Any, Dict, List
 
-import pymongo
-import pymongo.cursor
-import pymongo.typings
-import pymongo.collection
+from pymongo import MongoClient, collection, cursor
 from dacite import from_dict
 
 from mundobot.clash import Clash
@@ -18,10 +15,10 @@ class ClashManager:
     WILL BE CHANGED TO STORE AND LOAD FROM MONGODB
     """
 
-    def __init__(self, client: pymongo.MongoClient):
+    def __init__(self, client: MongoClient):
         self.client = client
-        self.clashes = client.clash.clashes
-        self.positions = client.clash.positions
+        self.clashes: collection.Collection = client.clash.clashes
+        self.positions: collection.Collection = client.clash.positions
 
     def check_clashes(self) -> List[Clash]:
         """Finds all clashes that are expired and pops them from the DB.
@@ -40,7 +37,7 @@ class ClashManager:
 
         return expired_clashes
 
-    def clashes_for_guild(self, guild_id: int) -> pymongo.cursor.Cursor:
+    def clashes_for_guild(self, guild_id: int) -> cursor.Cursor:
         """Gets all clashes present for a given guild.
 
         Args:
@@ -122,7 +119,7 @@ class ClashManager:
         return self.positions.find_one_and_update(
             {"clash_id": clash_id},
             {"$set": {f"players.{player_name}": team_role.name}},
-            return_document=pymongo.collection.ReturnDocument.AFTER,
+            return_document=collection.ReturnDocument.AFTER,
         )["players"]
 
     def unregister_player(self, clash_id: str, player_name: str) -> Dict[str, Any]:
@@ -138,44 +135,5 @@ class ClashManager:
         return self.positions.find_one_and_update(
             {"clash_id": clash_id},
             {"$unset": {f"players.{player_name}": ""}},
-            return_document=pymongo.collection.ReturnDocument.AFTER,
+            return_document=collection.ReturnDocument.AFTER,
         )["players"]
-
-
-# def serialize(obj: object) -> str:
-#     """Helper for serializing complex objects into json.
-
-#     Args:
-#         obj (object): A general object to be serialized.
-
-#     Returns:
-#         str: String serialization of the object.
-#     """
-#     if isinstance(obj, Position):
-#         return str(obj)
-#     if isinstance(obj, datetime.date):
-#         return str(obj)
-#     return str(obj)
-
-#     def dump_to_json(self, clash_flag=False, player_flag=False) -> None:
-#         """Writes clashes or players into json file based on param flags.
-
-#         Args:
-#             clash_flag (bool, optional): Indicates that clashes should be stored. Defaults to False.
-#             player_flag (bool, optional): Indicates that players should be stored. Defaults to False.
-#         """
-#         if clash_flag:
-#             with open(
-#                 os.path.join(self.path, "../clash/clash.json"), "w", encoding="UTF-8"
-#             ) as file:
-#                 dump_dict = {}
-#                 for name, clash in self.clashes.items():
-#                     dump_dict[name] = list(clash.__dict__.values())
-
-#                 json.dump(dump_dict, file, indent=4, default=serialize)
-
-#         if player_flag:
-#             with open(
-#                 os.path.join(self.path, "clash/players.json"), "w", encoding="UTF-8"
-#             ) as file:
-#                 json.dump(self.players, file, indent=4, default=serialize)
