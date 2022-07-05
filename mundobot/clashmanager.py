@@ -8,7 +8,7 @@ from dacite import from_dict
 
 from mundobot.clash import Clash
 from mundobot.position import Position
-from mundobot.clash_api_service import api_clash
+from mundobot.clash_api_service import ApiClash
 
 
 class ClashManager:
@@ -139,17 +139,17 @@ class ClashManager:
         )["players"]
 
     def get_needed_changes(
-        self, guild_id: int, confirmed_clashes: List[api_clash]
-    ) -> Tuple[List[api_clash], List[Clash]]:
+        self, guild_id: int, confirmed_clashes: List[ApiClash]
+    ) -> Tuple[List[ApiClash], List[Clash]]:
         """Finds all clashes that are missing in the saved clashes for a guild
         as well as clashes that are not present in confirmed clashes list.
 
         Args:
             guild_id (int): Id of the guild to check.
-            confirmed_clashes (List[api_clash]): List of clashes against which to compare.
+            confirmed_clashes (List[ApiClash]): List of clashes against which to compare.
 
         Returns:
-            Tuple[List[api_clash], List[Clash]]: List of not present clashes
+            Tuple[List[ApiClash], List[Clash]]: List of not present clashes
             and a list of surplus clashes.
         """
         missing_names = list(map(lambda c: c.name, confirmed_clashes))

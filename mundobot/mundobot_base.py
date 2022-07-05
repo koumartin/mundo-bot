@@ -8,7 +8,6 @@ import queue
 from typing import Dict, List, Tuple
 from urllib.parse import quote_plus
 from uuid import UUID, getnode
-from bson import UuidRepresentation
 from dacite import from_dict
 
 import discord as dc
@@ -17,7 +16,7 @@ from discord.ext import commands
 from discord.ext.commands.context import Context
 from pymongo import MongoClient
 
-from mundobot.clash_api_service import ClashApiService, api_clash
+from mundobot.clash_api_service import ClashApiService, ApiClash
 from mundobot.clashmanager import ClashManager
 from mundobot.clash import Clash
 from mundobot.position import Position
@@ -63,7 +62,7 @@ class MundoBot(commands.Bot):
         self.playback_queue_handle: Dict[dc.Guild, Tuple[bool, bool]] = {}
 
         self.client = MongoClient(
-            mongodbConnectionString, uuidRepresentation=UuidRepresentation.STANDARD
+            mongodbConnectionString, uuidRepresentation="standard"
         )
         self.clash_manager = ClashManager(self.client)
         self.accepted_reactions = Position.accepted_reactions()
@@ -77,7 +76,7 @@ class MundoBot(commands.Bot):
 
     def start_running(self) -> None:
         """Commands the bot to log in and start running using its api token."""
-        asyncio.get_event_loop().create_task(self.check_for_singleton())
+        self.loop.create_task(self.check_for_singleton())
         self.run(self.token)
 
     def add_all_commands(self) -> None:
@@ -265,24 +264,18 @@ class MundoBot(commands.Bot):
 
             print(ctx.author, "called !shutup in", ctx.guild)
 
-            # TODO: REDO WITH PERMISSIONS
-            if (
-                ctx.author.name != "KoudyCZ"
-                and ctx.author.name != "adjalS"
-                and additional.lower() != "please"
-                and additional.lower() != "prosím"
-            ):
-                await ctx.author.send("You no tell Mundo what Mundo do!!!")
-                return
-
             if additional.lower() == "please" or additional.lower() == "prosím":
                 await ctx.author.send(
                     "You say please so nice... Okey Mundo be silent now."
                 )
-                if voice_client is not None:
-                    voice_client.stop()
-                self.playback_queue_handle[guild] = (True, True)
-                self.playback_queue[guild] = queue.Queue()
+            elif not ctx.author.guild_permissions.manage_channels:
+                await ctx.author.send("You no tell Mundo what Mundo do!!!")
+                return
+
+            if voice_client is not None:
+                voice_client.stop()
+            self.playback_queue_handle[guild] = (True, True)
+            self.playback_queue[guild] = queue.Queue()
 
         # -----------------------------------------------------
         # CLASH COMMANDS
@@ -323,7 +316,7 @@ class MundoBot(commands.Bot):
             clash: Clash = self.clash_manager.remove_clash(clash_name, ctx.guild.id)
             await self.remove_clash_internal(clash)
 
-        @self.command
+        @self.command()
         async def load_clashes(ctx: Context) -> None:
             """Loads clashes for callers server.
 
@@ -336,7 +329,7 @@ class MundoBot(commands.Bot):
                 return
 
             guild: dc.Guild = ctx.guild
-            clashes: List[api_clash] = self.clash_api_service.get_clashes()
+            clashes: List[ApiClash] = self.clash_api_service.get_clashes()
             missing_clashes, surplus_clashes = self.clash_manager.get_needed_changes(
                 guild.id, clashes
             )
@@ -346,8 +339,6 @@ class MundoBot(commands.Bot):
                 )
             for clash in surplus_clashes:
                 await self.remove_clash_internal(clash)
-
-            pass
 
         @self.command()
         async def register_server(ctx: Context, update_time: str) -> None:
@@ -648,30 +639,36 @@ class MundoBot(commands.Bot):
         Makes itself the singleton in case the old one is not refreshed.
         Refreshes if currently being singleton.
         """
-        current_value = self.singleton_collection.find_one()
-        if current_value.singleton_id == self.identifier:
-            print("Refreshing singleton lock")
-            self.singleton_collection.replace_one(
-                {"_id": current_value["_id"]},
-                {
-                    "$set": {
-                        "$valid_until": datetime.now()
-                        + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
-                    }
-                },
-            )
-        elif datetime.now() > current_value.valid_until:
-            self.singleton_collection.replace_one(
-                {"_id": current_value["_id"]},
-                {
-                    "$set": {
-                        "$valid_until": datetime.now()
-                        + timedelta(minutes=LOCK_REFRESH_TIMEOUT),
+        while True:
+            current_value = self.singleton_collection.find_one()
+            if not current_value["singleton_id"]:
+                print("Initializing singleton")
+                self.singleton_collection.insert_one(
+                    {
                         "singleton_id": self.identifier,
+                        "valid_until": datetime.now()
+                        + timedelta(minutes=LOCK_REFRESH_TIMEOUT),
                     }
-                },
-            )
-        await asyncio.sleep(LOCK_CHECK_TIMEOUT)
+                )
+            elif current_value["singleton_id"] == self.identifier:
+                print("Refreshing singleton lock")
+                new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
+                self.singleton_collection.update_one(
+                    {"_id": current_value["_id"]},
+                    {"$set": {"valid_until": new_time}},
+                )
+            elif datetime.now() > current_value.valid_until:
+                new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
+                self.singleton_collection.update_one(
+                    {"_id": current_value["_id"]},
+                    {
+                        "$set": {
+                            "singleton_id": self.identifier,
+                            "valid_until": new_time,
+                        }
+                    },
+                )
+            await asyncio.sleep(LOCK_CHECK_TIMEOUT)
 
     # -----------------------------------------------------
     # CONDITIONAL DELETE
@@ -702,7 +699,10 @@ if __name__ == "__main__":
     if mongodb == "Docker":
         docker_container = os.environ.get("dockerContainer")
         if docker_container:
-            connection_string = f"{quote_plus(docker_container)}://{quote_plus(username)}:{quote_plus(password)}@mongodb:27017"
+            connection_string = (
+                f"{quote_plus(docker_container)}://{quote_plus(username)}"
+                + ":{quote_plus(password)}@mongodb:27017"
+            )
         else:
             connection_string = (
                 f"mongodb://{quote_plus(username)}:{quote_plus(password)}@mongodb:27017"
