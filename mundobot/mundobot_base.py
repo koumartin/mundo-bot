@@ -313,8 +313,7 @@ class MundoBot(commands.Bot):
             if not await self.check_permissions(ctx.author):
                 return
 
-            clash: Clash = self.clash_manager.remove_clash(clash_name, ctx.guild.id)
-            await self.remove_clash_internal(clash)
+            await self.remove_clash_internal(ctx.guild, clash_name)
 
         @self.command()
         async def load_clashes(ctx: Context) -> None:
@@ -333,12 +332,15 @@ class MundoBot(commands.Bot):
             missing_clashes, surplus_clashes = self.clash_manager.get_needed_changes(
                 guild.id, clashes
             )
+            print(missing_clashes, surplus_clashes)
+            missing_clashes.sort(key=lambda c: c.date)
+
             for clash in missing_clashes:
                 await self.add_clash_internal(
                     guild, ctx.author, clash.name, clash.date, clash.id
                 )
             for clash in surplus_clashes:
-                await self.remove_clash_internal(clash)
+                await self.remove_clash_internal(ctx.guild, clash.name)
 
         @self.command()
         async def register_server(ctx: Context, update_time: str) -> None:
@@ -354,7 +356,6 @@ class MundoBot(commands.Bot):
                 return
 
             # TODO: Finish
-            pass
 
     async def check_permissions(self, member: dc.Member) -> bool:
         """Checks if member has manage_roles and manage_channels permissions.
@@ -395,6 +396,13 @@ class MundoBot(commands.Bot):
             clash_name (str): Name of the clash.
             date (str): Date of the clash
         """
+        # Convert date from iso format if necessary
+        try:
+            date_converted = datetime.fromisoformat(date)
+            date = date_converted.strftime("%d.%m.%Y")
+        except ValueError:
+            pass
+
         # Sends message to designated channel and also gets clash_channel
         clash_channel = next(
             (c for c in guild.text_channels if c.name == "clash"), None
@@ -403,8 +411,8 @@ class MundoBot(commands.Bot):
             await user.send("Mundo need clash text channel.")
             return
         message = await clash_channel.send(
-            f"@everyone Nábor na clash {clash_name} - {date}\n",
-            "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí"
+            f"@everyone Nábor na clash {clash_name} - {date}\n"
+            + "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí"
             + " nebo fill rolí, případně :thumbdown: pokud nemůžete.",
             allowed_mentions=dc.AllowedMentions.all(),
         )
@@ -465,12 +473,15 @@ class MundoBot(commands.Bot):
         # Add all this to clash manager for saving
         self.clash_manager.add_clash(clash)
 
-    async def remove_clash_internal(self, clash: Clash) -> None:
+    async def remove_clash_internal(self, guild: dc.Guild, clash_name: str) -> None:
         """Deletes clash and all associated propertis with it.
 
         Args:
-            clash (Clash): Clash object to be removed.
+            guild (dc.Guild): Guild in which the clash is removed.
+            clash_name (str): Name of clash to be removed.
         """
+        clash: Clash = self.clash_manager.remove_clash(clash_name, guild.id)
+
         guild = self.get_guild(clash.guild_id)
         # Delete role and channel
         role_name = clash.name + " Player"

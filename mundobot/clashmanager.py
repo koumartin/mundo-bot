@@ -156,13 +156,15 @@ class ClashManager:
         surplus_clashes = []
         all_clashes = self.clashes.find({"guild_id": guild_id})
         for clash in all_clashes:
-            if clash.name in missing_names:
-                missing_names.remove(clash.name)
+            if clash["name"] in missing_names:
+                missing_names.remove(clash["name"])
             else:
                 surplus_clashes.append(from_dict(Clash, clash))
 
-        missing_cashes = list(map(lambda c: c.name in missing_names, confirmed_clashes))
-        return (missing_cashes, surplus_clashes)
+        missing_clashes = list(
+            filter(lambda c: c.name in missing_names, confirmed_clashes)
+        )
+        return (missing_clashes, surplus_clashes)
 
     def register_server(self, server_id: int, update_time: str):
         pass

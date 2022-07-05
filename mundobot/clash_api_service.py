@@ -37,7 +37,7 @@ class ClashApiService:
         date: str = datetime.datetime.fromtimestamp(
             dto["schedule"][0]["startTime"] / 1000
         ).isoformat()
-        return (dto["id"], name_full, date)
+        return ApiClash(dto["id"], name_full, date)
 
     def get_clashes(self) -> List[ApiClash]:
         """Gets all clashes from Riot Api in form of (id, name, date).
