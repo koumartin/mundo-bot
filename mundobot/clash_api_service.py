@@ -1,10 +1,13 @@
 """Module for managing connection to Riot API."""
+from collections import namedtuple
 import datetime
 import os
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List
 
 import dotenv
 from riotwatcher import LolWatcher
+
+api_clash = namedtuple("api_clash", "id name date")
 
 
 class ClashApiService:
@@ -19,14 +22,14 @@ class ClashApiService:
         self.lol_watcher_clash = LolWatcher(api_key=self.api_key).clash
 
     @staticmethod
-    def map_clash_dto_to_clash(dto: Dict[str, Any]) -> Tuple[int, str, str]:
+    def map_clash_dto_to_clash(dto: Dict[str, Any]) -> api_clash:
         """Converts TournamentDto to tuple of id, name and date.
 
         Args:
             dto (TournamentDto): Clash instance in Riot data.
 
         Returns:
-            Tuple[int, str, str]: Id, name and date of the dto in a tuple.
+            api_clash: Id, name and date of the dto in a tuple.
         """
         name_main: str = dto["nameKey"].replace("_", " ").title()
         name_second: str = dto["nameKeySecondary"].replace("_", " ").title()
@@ -36,11 +39,11 @@ class ClashApiService:
         ).isoformat()
         return (dto["id"], name_full, date)
 
-    def get_clashes(self) -> List[Tuple[int, str, str]]:
+    def get_clashes(self) -> List[api_clash]:
         """Gets all clashes from Riot Api in form of (id, name, date).
 
         Returns:
-            List[Tuple[int, str, str]]: Clashes in form of (id, name, date).
+            List[api_clash]: Clashes in form of (id, name, date).
         """
         response = self.lol_watcher_clash.tournaments("eun1")
         # Map reponses to Clash data structure

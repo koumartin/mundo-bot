@@ -1,24 +1,24 @@
 """Module providing classes of Clashmanager that manages stored Clashes."""
 import datetime
 from dataclasses import asdict
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Tuple
 
 from pymongo import MongoClient, collection, cursor
 from dacite import from_dict
 
 from mundobot.clash import Clash
 from mundobot.position import Position
+from mundobot.clash_api_service import api_clash
 
 
 class ClashManager:
-    """Management class for storing and loading Clash instances to JSON.
-    WILL BE CHANGED TO STORE AND LOAD FROM MONGODB
-    """
+    """Management class for storing and loading Clash instances to MongoDb."""
 
     def __init__(self, client: MongoClient):
         self.client = client
         self.clashes: collection.Collection = client.clash.clashes
         self.positions: collection.Collection = client.clash.positions
+        self.registered_servers: collection.Collection = client.clash.registered_servers
 
     def check_clashes(self) -> List[Clash]:
         """Finds all clashes that are expired and pops them from the DB.
@@ -137,3 +137,35 @@ class ClashManager:
             {"$unset": {f"players.{player_name}": ""}},
             return_document=collection.ReturnDocument.AFTER,
         )["players"]
+
+    def get_needed_changes(
+        self, guild_id: int, confirmed_clashes: List[api_clash]
+    ) -> Tuple[List[api_clash], List[Clash]]:
+        """Finds all clashes that are missing in the saved clashes for a guild
+        as well as clashes that are not present in confirmed clashes list.
+
+        Args:
+            guild_id (int): Id of the guild to check.
+            confirmed_clashes (List[api_clash]): List of clashes against which to compare.
+
+        Returns:
+            Tuple[List[api_clash], List[Clash]]: List of not present clashes
+            and a list of surplus clashes.
+        """
+        missing_names = list(map(lambda c: c.name, confirmed_clashes))
+        surplus_clashes = []
+        all_clashes = self.clashes.find({"guild_id": guild_id})
+        for clash in all_clashes:
+            if clash.name in missing_names:
+                missing_names.remove(clash.name)
+            else:
+                surplus_clashes.append(from_dict(Clash, clash))
+
+        missing_cashes = list(map(lambda c: c.name in missing_names, confirmed_clashes))
+        return (missing_cashes, surplus_clashes)
+
+    def register_server(self, server_id: int, update_time: str):
+        pass
+
+    def unregister_server(self, server_id: int, update_time: str):
+        pass

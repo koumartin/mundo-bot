@@ -5,7 +5,7 @@ import asyncio
 from datetime import datetime, timedelta
 import os
 import queue
-from typing import Dict, Tuple
+from typing import Dict, List, Tuple
 from urllib.parse import quote_plus
 from uuid import UUID, getnode
 from bson import UuidRepresentation
@@ -17,6 +17,7 @@ from discord.ext import commands
 from discord.ext.commands.context import Context
 from pymongo import MongoClient
 
+from mundobot.clash_api_service import ClashApiService, api_clash
 from mundobot.clashmanager import ClashManager
 from mundobot.clash import Clash
 from mundobot.position import Position
@@ -66,6 +67,7 @@ class MundoBot(commands.Bot):
         )
         self.clash_manager = ClashManager(self.client)
         self.accepted_reactions = Position.accepted_reactions()
+        self.clash_api_service = ClashApiService()
 
         self.identifier: UUID = getnode()
         self.is_singleton = False
@@ -298,87 +300,10 @@ class MundoBot(commands.Bot):
             """
             await self.conditional_delete(ctx.message)
 
-            # Check caller permissions
-            if not (
-                ctx.author.guild_permissions.manage_roles
-                and ctx.author.guild_permissions.manage_channels
-            ):
-                await ctx.author.send(
-                    "Mundo no do work for lowlife like you. \
-                    Get more permissions.(manage channels and roles)"
-                )
+            if not await self.check_permissions(ctx.author):
                 return
 
-            # Sends message to designated channel and also gets clash_channel
-            clash_channel = next(
-                (c for c in ctx.guild.text_channels if c.name == "clash"), None
-            )
-            if clash_channel is None:
-                await ctx.author.send("Mundo need clash text channel.")
-                return
-            message = await clash_channel.send(
-                f"@everyone Nábor na clash {clash_name} - {date}\n",
-                "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí"
-                + " nebo fill rolí, případně :thumbdown: pokud nemůžete.",
-                allowed_mentions=dc.AllowedMentions.all(),
-            )
-
-            # Give access to new channel to everyone above or equal to requesting user +
-            # new designated role
-            overwrites = {}
-            author_role = max(ctx.author.roles)
-            for role in ctx.guild.roles:
-                overwrites[role] = dc.PermissionOverwrite(
-                    read_messages=(role >= author_role)
-                )
-
-            # Check if role with desired clash_name already exists, else create it and give
-            # it permissions to channel
-            role_name = clash_name + " Player"
-            role = next((r for r in ctx.guild.roles if r.name == role_name), None)
-            if role is None:
-                role: dc.Role = await ctx.guild.create_role(
-                    name=role_name, permissions=ctx.guild.default_role.permissions
-                )
-                overwrites[role] = dc.PermissionOverwrite(read_messages=True)
-
-            # Channel will be placed to category named Clash, else to no category
-            category = next(
-                (c for c in ctx.guild.categories if c.name == "Clash"), None
-            )
-
-            # Create new channel only if no channel of such name currently exists
-            channel = next(
-                (
-                    c
-                    for c in ctx.guild.channels
-                    if c.name == clash_name.replace(" ", "-").lower()
-                ),
-                None,
-            )
-            if channel is None:
-                channel = await ctx.guild.create_text_channel(
-                    clash_name, overwrites=overwrites, category=category
-                )
-
-            # Add message to channel and pin it
-            status = await channel.send(self.show_players(dict()))
-            await status.pin()
-
-            # Create new Clash object to hold all data about it and supporting structure
-            clash = Clash(
-                clash_name,
-                date,
-                ctx.guild.id,
-                clash_channel.id,
-                channel.id,
-                message.id,
-                role.id,
-                status.id,
-            )
-
-            # Add all this to clash manager for saving
-            self.clash_manager.add_clash(clash)
+            await self.add_clash_internal(ctx.guild, ctx.author, clash_name, date)
 
         @self.command()
         async def remove_clash(ctx: Context, clash_name: str) -> None:
@@ -392,24 +317,164 @@ class MundoBot(commands.Bot):
             """
             await self.conditional_delete(ctx.message)
 
-            # Check caller permissions
-            if not (
-                ctx.author.guild_permissions.manage_roles
-                and ctx.author.guild_permissions.manage_channels
-            ):
-                await ctx.author.send(
-                    "Mundo no do work for lowlife like you. Get more permissions."
-                    "(manage channels and roles)"
-                )
+            if not await self.check_permissions(ctx.author):
                 return
 
             clash: Clash = self.clash_manager.remove_clash(clash_name, ctx.guild.id)
-            await self.delete_clash(clash)
+            await self.remove_clash_internal(clash)
+
+        @self.command
+        async def load_clashes(ctx: Context) -> None:
+            """Loads clashes for callers server.
+
+            Args:
+                ctx (Context): Context of the command.
+            """
+            await self.conditional_delete(ctx.message)
+
+            if not await self.check_permissions(ctx.author):
+                return
+
+            guild: dc.Guild = ctx.guild
+            clashes: List[api_clash] = self.clash_api_service.get_clashes()
+            missing_clashes, surplus_clashes = self.clash_manager.get_needed_changes(
+                guild.id, clashes
+            )
+            for clash in missing_clashes:
+                await self.add_clash_internal(
+                    guild, ctx.author, clash.name, clash.date, clash.id
+                )
+            for clash in surplus_clashes:
+                await self.remove_clash_internal(clash)
+
+            pass
+
+        @self.command()
+        async def register_server(ctx: Context, update_time: str) -> None:
+            """Registers a clash server to receive notifications about clash.
+
+            Args:
+                ctx (Context): Context of the command
+                update_time (str): Time at which the clash messages will be sent.
+            """
+            await self.conditional_delete(ctx.message)
+
+            if not await self.check_permissions(ctx.author):
+                return
+
+            # TODO: Finish
+            pass
+
+    async def check_permissions(self, member: dc.Member) -> bool:
+        """Checks if member has manage_roles and manage_channels permissions.
+
+        Args:
+            member (dc.Member): Member to be checked.
+
+        Returns:
+            bool: Resulting answer.
+        """
+        ret = True
+        if not (
+            member.guild_permissions.manage_roles
+            and member.guild_permissions.manage_channels
+        ):
+            await member.send(
+                "Mundo no do work for lowlife like you. \
+                Get more permissions.(manage channels and roles)"
+            )
+            ret = False
+
+        return ret
 
     # -----------------------------------------------------
-    # HELPER FOR DELETING ALL CLASH BELONGINGS
+    # HELPER FUNCTION FOR CLASH INSTANCES
     # -----------------------------------------------------
-    async def delete_clash(self, clash: Clash) -> None:
+    async def add_clash_internal(
+        self,
+        guild: dc.Guild,
+        user: dc.Member,
+        clash_name: str,
+        date: str,
+        riot_id: int = None,
+    ) -> None:
+        """Adds clash and generates roles, channels and messages for it.
+
+        Args:
+            clash_name (str): Name of the clash.
+            date (str): Date of the clash
+        """
+        # Sends message to designated channel and also gets clash_channel
+        clash_channel = next(
+            (c for c in guild.text_channels if c.name == "clash"), None
+        )
+        if clash_channel is None:
+            await user.send("Mundo need clash text channel.")
+            return
+        message = await clash_channel.send(
+            f"@everyone Nábor na clash {clash_name} - {date}\n",
+            "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí"
+            + " nebo fill rolí, případně :thumbdown: pokud nemůžete.",
+            allowed_mentions=dc.AllowedMentions.all(),
+        )
+
+        # Give access to new channel to everyone above or equal to requesting user +
+        # new designated role
+        overwrites = {}
+        author_role = max(user.roles)
+        for role in guild.roles:
+            overwrites[role] = dc.PermissionOverwrite(
+                read_messages=(role >= author_role)
+            )
+
+        # Check if role with desired clash_name already exists, else create it and give
+        # it permissions to channel
+        role_name = clash_name + " Player"
+        role = next((r for r in guild.roles if r.name == role_name), None)
+        if role is None:
+            role: dc.Role = await guild.create_role(
+                name=role_name, permissions=guild.default_role.permissions
+            )
+            overwrites[role] = dc.PermissionOverwrite(read_messages=True)
+
+        # Channel will be placed to category named Clash, else to no category
+        category = next((c for c in guild.categories if c.name == "Clash"), None)
+
+        # Create new channel only if no channel of such name currently exists
+        channel = next(
+            (
+                c
+                for c in guild.channels
+                if c.name == clash_name.replace(" ", "-").lower()
+            ),
+            None,
+        )
+        if channel is None:
+            channel = await guild.create_text_channel(
+                clash_name, overwrites=overwrites, category=category
+            )
+
+        # Add message to channel and pin it
+        status = await channel.send(self.show_players(dict()))
+        await status.pin()
+
+        # Create new Clash object to hold all data about it and supporting structure
+        clash = Clash(
+            clash_name,
+            date,
+            guild.id,
+            clash_channel.id,
+            channel.id,
+            message.id,
+            role.id,
+            status.id,
+            riot_id=riot_id,
+        )
+
+        # Add all this to clash manager for saving
+        self.clash_manager.add_clash(clash)
+
+    async def remove_clash_internal(self, clash: Clash) -> None:
         """Deletes clash and all associated propertis with it.
 
         Args:
