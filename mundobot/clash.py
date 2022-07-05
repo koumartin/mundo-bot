@@ -15,12 +15,14 @@ class Clash:
     message_id: int
     role_id: int
     status_id: int
+    riot_id: int = None
     date: datetime.datetime = None
 
     def __post_init__(self):
-        try:
-            self.date = datetime.datetime.strptime(self.date_string, "%d.%m.%Y")
-        except ValueError:
-            self.date = datetime.datetime.fromisoformat(self.date_string).replace(
-                hour=0, minute=0, second=0
-            )
+        if self.date is None:
+            try:
+                self.date = datetime.datetime.strptime(self.date_string, "%d.%m.%Y")
+            except ValueError:
+                self.date = datetime.datetime.fromisoformat(self.date_string).replace(
+                    hour=0, minute=0, second=0
+                )
