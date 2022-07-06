@@ -2,24 +2,23 @@
 Mundo bot class and commands for running it.
 """
 import asyncio
-from datetime import datetime, timedelta
 import os
 import queue
+from datetime import datetime, timedelta
 from typing import Dict, List, Tuple
-from urllib.parse import quote_plus
 from uuid import UUID, getnode
-from dacite import from_dict
 
 import discord as dc
-import dotenv
+from dacite import from_dict
 from discord.ext import commands
 from discord.ext.commands.context import Context
 from pymongo import MongoClient
 
-from mundobot.clash_api_service import ClashApiService, ApiClash
-from mundobot.clashmanager import ClashManager
 from mundobot.clash import Clash
+from mundobot.clash_api_service import ApiClash, ClashApiService
+from mundobot.clashmanager import ClashManager
 from mundobot.position import Position
+import mundobot.helpers as helpers
 
 # -------------------------------------------
 # ADDITIONAL INFORMATION:
@@ -161,7 +160,7 @@ class MundoBot(commands.Bot):
                 status_message: dc.Message = await channel.fetch_message(
                     clash.status_id
                 )
-                await status_message.edit(content=self.show_players(new_positions))
+                await status_message.edit(content=helpers.show_players(new_positions))
                 break
 
         @self.event
@@ -203,7 +202,9 @@ class MundoBot(commands.Bot):
                     status_message: dc.Message = await channel.fetch_message(
                         clash.status_id
                     )
-                    await status_message.edit(content=self.show_players(new_positions))
+                    await status_message.edit(
+                        content=helpers.show_players(new_positions)
+                    )
                 break
 
         # -----------------------------------------------------
@@ -257,7 +258,7 @@ class MundoBot(commands.Bot):
                 additional (str, optional): Additional string value used to say please.
                     Defaults to "".
             """
-            await self.conditional_delete(ctx.message)
+            await helpers.conditional_delete(ctx.message)
 
             guild = ctx.guild
             voice_client = dc.utils.get(self.voice_clients, guild=guild)
@@ -291,7 +292,7 @@ class MundoBot(commands.Bot):
                 clash_name (str): Name of the clash to be added.
                 date (str): Date in d/m/Y format.
             """
-            await self.conditional_delete(ctx.message)
+            await helpers.conditional_delete(ctx.message)
 
             if not await self.check_permissions(ctx.author):
                 return
@@ -308,7 +309,7 @@ class MundoBot(commands.Bot):
                 ctx (Context): Context of the command.
                 clash_name (str): Name of the clash to be removed.
             """
-            await self.conditional_delete(ctx.message)
+            await helpers.conditional_delete(ctx.message)
 
             if not await self.check_permissions(ctx.author):
                 return
@@ -322,7 +323,7 @@ class MundoBot(commands.Bot):
             Args:
                 ctx (Context): Context of the command.
             """
-            await self.conditional_delete(ctx.message)
+            await helpers.conditional_delete(ctx.message)
 
             if not await self.check_permissions(ctx.author):
                 return
@@ -343,20 +344,48 @@ class MundoBot(commands.Bot):
                 await self.remove_clash_internal(ctx.guild, clash.name)
 
         @self.command()
-        async def register_server(ctx: Context, update_time: str) -> None:
-            """Registers a clash server to receive notifications about clash.
+        async def register_server(ctx: Context) -> None:
+            """Registers a clash server to receive notifications about clashes.
 
             Args:
                 ctx (Context): Context of the command
-                update_time (str): Time at which the clash messages will be sent.
             """
-            await self.conditional_delete(ctx.message)
+            await helpers.conditional_delete(ctx.message)
 
             if not await self.check_permissions(ctx.author):
                 return
 
-            # TODO: Finish
+            success = self.clash_manager.register_server(ctx.guild.id)
+            if success:
+                await ctx.channel.send("Server now receive clash updates.")
+            else:
+                await ctx.author.send(
+                    "You already receive clash updates. Me no do things two, me no stupid."
+                )
 
+        @self.command()
+        async def unregister_server(ctx: Context) -> None:
+            """Unregisters a clash server from receiving notifications about clashes.
+
+            Args:
+                ctx (Context): Context of the command
+            """
+            await helpers.conditional_delete(ctx.message)
+
+            if not await self.check_permissions(ctx.author):
+                return
+
+            success = self.clash_manager.unregister_server(ctx.guild.id)
+            if success:
+                await ctx.channel.send("Server now no receive clash updates.")
+            else:
+                await ctx.author.send(
+                    "You not receive clash updates. Me no stupid to remove something no existing."
+                )
+
+    # -----------------------------------------------------
+    # HELPER FUNCTION FOR CHECKING REQUIRED PERMISSIONS
+    # -----------------------------------------------------
     async def check_permissions(self, member: dc.Member) -> bool:
         """Checks if member has manage_roles and manage_channels permissions.
 
@@ -404,9 +433,7 @@ class MundoBot(commands.Bot):
             pass
 
         # Sends message to designated channel and also gets clash_channel
-        clash_channel = next(
-            (c for c in guild.text_channels if c.name == "clash"), None
-        )
+        clash_channel = helpers.find_clash_channel(guild)
         if clash_channel is None:
             await user.send("Mundo need clash text channel.")
             return
@@ -454,7 +481,7 @@ class MundoBot(commands.Bot):
             )
 
         # Add message to channel and pin it
-        status = await channel.send(self.show_players(dict()))
+        status = await channel.send(helpers.show_players(dict()))
         await status.pin()
 
         # Create new Clash object to hold all data about it and supporting structure
@@ -499,66 +526,6 @@ class MundoBot(commands.Bot):
         channel = guild.get_channel(clash.clash_channel_id)
         message = await channel.fetch_message(clash.message_id)
         await message.delete()
-
-    # -----------------------------------------------------
-    # METHODS FOR CREATING STRING OF CURRENTLY REGISTERED PLAYERS FOR GIVEN CLASH
-    # -----------------------------------------------------
-    def show_players(self, players: Dict[str, str]) -> str:
-        """Creates a string containing the registered team of players in a clash.
-
-        Args:
-            players (Dict[str, str]): Dictionary of players and theire role as string.
-
-        Returns:
-            str: Formatted string of players in a team.
-        """
-        players_modified = dict(map(lambda x: (x[0], Position[x[1]]), players.items()))
-
-        output = "Aktuální sestava\n"
-        for position in Position:
-            output += (
-                f"{str(position)} : {self.find_players(position, players_modified)}\n"
-            )
-        return output
-
-    @staticmethod
-    def find_players(target: Position, players: Dict[str, Position]) -> str:
-        """Gets names of all players with given position in registered players for clash.
-
-        Args:
-            target (Position): Position of the players.
-            players (Dict[str, Position]): Dictionary of registered players.
-
-        Returns:
-            str: Names of all players with that position or empty string.
-        """
-        output = ""
-        for player, position in players.items():
-            if position == target:
-                output += player + " "
-        return output
-
-    @staticmethod
-    async def remove_reactions(
-        user: dc.Member | dc.User, message: dc.Message, pos: Position
-    ) -> None:
-        """Removes a reaction associated with position from the messsage.
-
-        Args:
-            user (dc.Member | dc.User): User or Member for which teh reaction is removed.
-            message (dc.Message): Message on which the reaction is removed.
-            pos (Position): Position associated with removed reaction.
-        """
-        for reaction in message.reactions:
-            if isinstance(reaction.emoji, str):
-                emoji_name = reaction.emoji
-            else:
-                emoji_name = reaction.emoji.name
-            if Position.get_position(emoji_name) != pos:
-                users = await reaction.users().flatten()
-                for user in users:
-                    if user == user:
-                        await message.remove_reaction(reaction.emoji, user)
 
     # -----------------------------------------------------
     # MUNDO GREET ADDITIONAL METHODS
@@ -680,53 +647,6 @@ class MundoBot(commands.Bot):
                     },
                 )
             await asyncio.sleep(LOCK_CHECK_TIMEOUT)
-
-    # -----------------------------------------------------
-    # CONDITIONAL DELETE
-    # ----------------------------------------------------
-    @staticmethod
-    async def conditional_delete(message: dc.Message) -> None:
-        """Deletes a message if it is in a TextChannel.
-
-        Args:
-            message (dc.Message): Message that might be deleted.
-        """
-        if isinstance(message.channel, dc.TextChannel):
-            await message.delete()
-
-
-# -----------------------------------------------------
-# MAIN
-# -----------------------------------------------------
-if __name__ == "__main__":
-    dotenv.load_dotenv()
-
-    bot_token = os.environ.get("botToken")
-
-    # Resolving connection to database
-    username = os.environ.get("mongoUsername")
-    password = os.environ.get("mongoPassword")
-    mongodb = os.environ.get("mongodb")
-    if mongodb == "Docker":
-        docker_container = os.environ.get("dockerContainer")
-        if docker_container:
-            connection_string = (
-                f"{quote_plus(docker_container)}://{quote_plus(username)}"
-                + ":{quote_plus(password)}@mongodb:27017"
-            )
-        else:
-            connection_string = (
-                f"mongodb://{quote_plus(username)}:{quote_plus(password)}@mongodb:27017"
-            )
-    elif mongodb == "External":
-        connection_string = os.environ.get("MongodbConnectionString")
-    else:
-        connection_string = (
-            f"mongodb://{quote_plus(username)}:{quote_plus(password)}@localhost:27017"
-        )
-
-    bot = MundoBot(bot_token, connection_string)
-    bot.start_running()
 
     # # -----------------------------------------------------
     # # CLASH CONSISTENCY CHECKS TO BE RUN AT THE LOGIN

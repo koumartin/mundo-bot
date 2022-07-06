@@ -166,8 +166,29 @@ class ClashManager:
         )
         return (missing_clashes, surplus_clashes)
 
-    def register_server(self, server_id: int, update_time: str):
-        pass
+    def register_server(self, server_id: int) -> bool:
+        """Registers a server for clash updates.
 
-    def unregister_server(self, server_id: int, update_time: str):
-        pass
+        Args:
+            server_id (int): Id of the server to receive updtes.
+
+        Returns:
+            bool: Success of the operation.
+        """
+        existing_server = self.registered_servers.find_one({"server_id": server_id})
+        if existing_server is None:
+            self.registered_servers.insert_one({"server_id": server_id})
+            return True
+        return False
+
+    def unregister_server(self, server_id: int) -> bool:
+        """Unregisters a server from clash updates.
+
+        Args:
+            server_id (int): Id of the server to be unregistered.
+
+        Returns:
+            bool: Success of the operation.
+        """
+        deleted_server = self.registered_servers.delete_one({"server_id": server_id})
+        return deleted_server.deleted_count > 0
