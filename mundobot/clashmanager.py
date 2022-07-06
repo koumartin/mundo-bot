@@ -100,6 +100,8 @@ class ClashManager:
         result = self.clashes.find_one_and_delete(
             {"name": clash_name, "guild_id": guild_id}
         )
+        if result is None:
+            return None
         self.positions.delete_one({"clash_id": result["_id"]})
         return from_dict(Clash, result)
 

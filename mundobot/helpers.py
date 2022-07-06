@@ -1,9 +1,18 @@
+"""Module of helper functions for MundoBot."""
 from typing import Dict
 import discord as dc
 from mundobot.position import Position
 
 
 def find_clash_channel(guild: dc.Guild) -> dc.TextChannel:
+    """Finds a channel named clash in the guild.
+
+    Args:
+        guild (dc.Guild): Guild to find the channel in.
+
+    Returns:
+        dc.TextChannel: Clash text channel.
+    """
     return next((c for c in guild.text_channels if c.name == "clash"), None)
 
 
@@ -51,8 +60,31 @@ def show_players(players: Dict[str, str]) -> str:
     return output
 
 
+async def check_permissions(member: dc.Member) -> bool:
+    """Checks if member has manage_roles and manage_channels permissions.
+
+    Args:
+        member (dc.Member): Member to be checked.
+
+    Returns:
+        bool: Resulting answer.
+    """
+    ret = True
+    if not (
+        member.guild_permissions.manage_roles
+        and member.guild_permissions.manage_channels
+    ):
+        await member.send(
+            "Mundo no do work for lowlife like you. \
+                Get more permissions.(manage channels and roles)"
+        )
+        ret = False
+
+    return ret
+
+
 async def remove_reactions(
-    user: dc.Member | dc.User, message: dc.Message, pos: Position
+    target_user: dc.Member | dc.User, message: dc.Message, pos: Position
 ) -> None:
     """Removes a reaction associated with position from the messsage.
 
@@ -69,5 +101,5 @@ async def remove_reactions(
         if Position.get_position(emoji_name) != pos:
             users = await reaction.users().flatten()
             for user in users:
-                if user == user:
-                    await message.remove_reaction(reaction.emoji, user)
+                if user == target_user:
+                    await message.remove_reaction(reaction.emoji, target_user)

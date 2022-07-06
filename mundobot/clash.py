@@ -1,6 +1,7 @@
 """Module providing Clash dataclass for storing League clash data."""
 from dataclasses import dataclass
 import datetime
+from typing import List
 
 
 @dataclass
@@ -15,6 +16,7 @@ class Clash:
     message_id: int
     role_id: int
     status_id: int
+    notification_message_ids: List[int] = []
     riot_id: int = None
     date: datetime.datetime = None
 

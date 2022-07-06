@@ -18,7 +18,7 @@ from mundobot.clash import Clash
 from mundobot.clash_api_service import ApiClash, ClashApiService
 from mundobot.clashmanager import ClashManager
 from mundobot.position import Position
-import mundobot.helpers as helpers
+from mundobot import helpers
 
 # -------------------------------------------
 # ADDITIONAL INFORMATION:
@@ -294,7 +294,7 @@ class MundoBot(commands.Bot):
             """
             await helpers.conditional_delete(ctx.message)
 
-            if not await self.check_permissions(ctx.author):
+            if not await helpers.check_permissions(ctx.author):
                 return
 
             await self.add_clash_internal(ctx.guild, ctx.author, clash_name, date)
@@ -311,7 +311,7 @@ class MundoBot(commands.Bot):
             """
             await helpers.conditional_delete(ctx.message)
 
-            if not await self.check_permissions(ctx.author):
+            if not await helpers.check_permissions(ctx.author):
                 return
 
             await self.remove_clash_internal(ctx.guild, clash_name)
@@ -325,7 +325,7 @@ class MundoBot(commands.Bot):
             """
             await helpers.conditional_delete(ctx.message)
 
-            if not await self.check_permissions(ctx.author):
+            if not await helpers.check_permissions(ctx.author):
                 return
 
             guild: dc.Guild = ctx.guild
@@ -352,7 +352,7 @@ class MundoBot(commands.Bot):
             """
             await helpers.conditional_delete(ctx.message)
 
-            if not await self.check_permissions(ctx.author):
+            if not await helpers.check_permissions(ctx.author):
                 return
 
             success = self.clash_manager.register_server(ctx.guild.id)
@@ -372,7 +372,7 @@ class MundoBot(commands.Bot):
             """
             await helpers.conditional_delete(ctx.message)
 
-            if not await self.check_permissions(ctx.author):
+            if not await helpers.check_permissions(ctx.author):
                 return
 
             success = self.clash_manager.unregister_server(ctx.guild.id)
@@ -382,31 +382,6 @@ class MundoBot(commands.Bot):
                 await ctx.author.send(
                     "You not receive clash updates. Me no stupid to remove something no existing."
                 )
-
-    # -----------------------------------------------------
-    # HELPER FUNCTION FOR CHECKING REQUIRED PERMISSIONS
-    # -----------------------------------------------------
-    async def check_permissions(self, member: dc.Member) -> bool:
-        """Checks if member has manage_roles and manage_channels permissions.
-
-        Args:
-            member (dc.Member): Member to be checked.
-
-        Returns:
-            bool: Resulting answer.
-        """
-        ret = True
-        if not (
-            member.guild_permissions.manage_roles
-            and member.guild_permissions.manage_channels
-        ):
-            await member.send(
-                "Mundo no do work for lowlife like you. \
-                Get more permissions.(manage channels and roles)"
-            )
-            ret = False
-
-        return ret
 
     # -----------------------------------------------------
     # HELPER FUNCTION FOR CLASH INSTANCES
@@ -509,23 +484,23 @@ class MundoBot(commands.Bot):
         """
         clash: Clash = self.clash_manager.remove_clash(clash_name, guild.id)
 
+        if clash is None:
+            return
+
         guild = self.get_guild(clash.guild_id)
         # Delete role and channel
-        role_name = clash.name + " Player"
-        roles = (r for r in guild.roles if r.name == role_name)
-        for role in roles:
-            await role.delete()
-        channels = (
-            channel
-            for channel in guild.text_channels
-            if channel.name == clash.name.replace(" ", "-").lower()
-        )
-        for channel in channels:
-            await channel.delete()
-        # Delete original message in general clash channel
+        role = guild.get_role(clash.role_id)
+        await role.delete()
+        channel = guild.get_channel(clash.channel_id)
+        await channel.delete()
+
+        # Delete original message and notifications in general clash channel
         channel = guild.get_channel(clash.clash_channel_id)
-        message = await channel.fetch_message(clash.message_id)
-        await message.delete()
+        clash.notification_message_ids.append(clash.message_id)
+
+        for message_id in clash.notification_message_ids:
+            message = await channel.fetch_message(message_id)
+            await message.delete()
 
     # -----------------------------------------------------
     # MUNDO GREET ADDITIONAL METHODS
