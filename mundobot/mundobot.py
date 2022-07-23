@@ -5,7 +5,7 @@ import asyncio
 import os
 import queue
 from datetime import datetime, timedelta
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 from uuid import UUID, getnode
 
 import discord as dc
@@ -13,6 +13,7 @@ from dacite import from_dict
 from discord.ext import commands
 from discord.ext.commands.context import Context
 from pymongo import MongoClient
+import schedule
 
 from mundobot.clash import Clash
 from mundobot.clash_api_service import ApiClash, ClashApiService
@@ -26,8 +27,8 @@ from mundobot import helpers
 # Date: 22/3/2021
 # -------------------------------------------
 
-LOCK_REFRESH_TIMEOUT = 3  # minutes
-LOCK_CHECK_TIMEOUT = 2.5 * 60  # 2.5 minutes
+LOCK_REFRESH_TIMEOUT = 5  # minutes
+LOCK_CHECK_TIMEOUT = 4 * 60  # 5 minutes
 
 
 class MundoBot(commands.Bot):
@@ -69,6 +70,7 @@ class MundoBot(commands.Bot):
 
         self.identifier: UUID = getnode()
         self.is_singleton = False
+        self.job: schedule.Job = None
         self.singleton_collection = self.client.bot.singleton
 
         self.add_all_commands()
@@ -297,7 +299,7 @@ class MundoBot(commands.Bot):
             if not await helpers.check_permissions(ctx.author):
                 return
 
-            await self.add_clash_internal(ctx.guild, ctx.author, clash_name, date)
+            await self.add_clash_internal(ctx.guild, clash_name, date, ctx.author)
 
         @self.command()
         async def remove_clash(ctx: Context, clash_name: str) -> None:
@@ -329,19 +331,7 @@ class MundoBot(commands.Bot):
                 return
 
             guild: dc.Guild = ctx.guild
-            clashes: List[ApiClash] = self.clash_api_service.get_clashes()
-            missing_clashes, surplus_clashes = self.clash_manager.get_needed_changes(
-                guild.id, clashes
-            )
-            print(missing_clashes, surplus_clashes)
-            missing_clashes.sort(key=lambda c: c.date)
-
-            for clash in missing_clashes:
-                await self.add_clash_internal(
-                    guild, ctx.author, clash.name, clash.date, clash.id
-                )
-            for clash in surplus_clashes:
-                await self.remove_clash_internal(ctx.guild, clash.name)
+            self.load_clashes_for_guild(guild.id)
 
         @self.command()
         async def register_server(ctx: Context) -> None:
@@ -383,16 +373,25 @@ class MundoBot(commands.Bot):
                     "You not receive clash updates. Me no stupid to remove something no existing."
                 )
 
+        @self.command()
+        async def test(ctx: Context) -> None:
+            """Testing function
+
+            Args:
+                ctx (Context): Context of the command.
+            """
+            print(ctx.guild.roles)
+
     # -----------------------------------------------------
     # HELPER FUNCTION FOR CLASH INSTANCES
     # -----------------------------------------------------
     async def add_clash_internal(
         self,
         guild: dc.Guild,
-        user: dc.Member,
         clash_name: str,
         date: str,
-        riot_id: int = None,
+        user: Optional[dc.Member] = None,
+        riot_id: Optional[int] = None,
     ) -> None:
         """Adds clash and generates roles, channels and messages for it.
 
@@ -408,11 +407,21 @@ class MundoBot(commands.Bot):
             pass
 
         # Sends message to designated channel and also gets clash_channel
-        clash_channel = helpers.find_clash_channel(guild)
+        clash_channel = helpers.find_text_channel_by_name(guild, "clash")
         if clash_channel is None:
-            await user.send("Mundo need clash text channel.")
+            if user is not None:
+                await user.send("Mundo need clash text channel.")
+            else:
+                default_channel: dc.TextChannel = guild.system_channel
+                if (
+                    default_channel is not None
+                    and default_channel.permissions_for(guild.me).send_messages
+                ):
+                    await default_channel.send(
+                        "Mundo need clash text channel to send clash update."
+                    )
             return
-        message = await clash_channel.send(
+        message: dc.Message = await clash_channel.send(
             f"@everyone Nábor na clash {clash_name} - {date}\n"
             + "Pokud můžete a chcete si zahrát tak zareagujete svojí rolí"
             + " nebo fill rolí, případně :thumbdown: pokud nemůžete.",
@@ -421,6 +430,8 @@ class MundoBot(commands.Bot):
 
         # Give access to new channel to everyone above or equal to requesting user +
         # new designated role
+        if user is None:
+            user = guild.owner
         overwrites = {}
         author_role = max(user.roles)
         for role in guild.roles:
@@ -442,21 +453,14 @@ class MundoBot(commands.Bot):
         category = next((c for c in guild.categories if c.name == "Clash"), None)
 
         # Create new channel only if no channel of such name currently exists
-        channel = next(
-            (
-                c
-                for c in guild.channels
-                if c.name == clash_name.replace(" ", "-").lower()
-            ),
-            None,
-        )
+        channel = helpers.find_text_channel_by_name(guild, clash_name)
         if channel is None:
             channel = await guild.create_text_channel(
                 clash_name, overwrites=overwrites, category=category
             )
 
         # Add message to channel and pin it
-        status = await channel.send(helpers.show_players(dict()))
+        status: dc.Message = await channel.send(helpers.show_players({}))
         await status.pin()
 
         # Create new Clash object to hold all data about it and supporting structure
@@ -472,8 +476,10 @@ class MundoBot(commands.Bot):
             riot_id=riot_id,
         )
 
+        notification_times = helpers.prepare_notification_times(clash)
+
         # Add all this to clash manager for saving
-        self.clash_manager.add_clash(clash)
+        self.clash_manager.add_clash(clash, notification_times)
 
     async def remove_clash_internal(self, guild: dc.Guild, clash_name: str) -> None:
         """Deletes clash and all associated propertis with it.
@@ -487,11 +493,19 @@ class MundoBot(commands.Bot):
         if clash is None:
             return
 
-        guild = self.get_guild(clash.guild_id)
+        await self.remove_individual_clash(clash)
+
+    async def remove_individual_clash(self, clash: Clash) -> None:
+        """Removes all discord properties related to clash.
+
+        Args:
+            clash (Clash): Clash which is being deleted.
+        """
+        guild: dc.Guild = self.get_guild(clash.guild_id)
         # Delete role and channel
-        role = guild.get_role(clash.role_id)
+        role: dc.Role = guild.get_role(clash.role_id)
         await role.delete()
-        channel = guild.get_channel(clash.channel_id)
+        channel: dc.TextChannel = guild.get_channel(clash.channel_id)
         await channel.delete()
 
         # Delete original message and notifications in general clash channel
@@ -499,7 +513,7 @@ class MundoBot(commands.Bot):
         clash.notification_message_ids.append(clash.message_id)
 
         for message_id in clash.notification_message_ids:
-            message = await channel.fetch_message(message_id)
+            message: dc.Message = await channel.fetch_message(message_id)
             await message.delete()
 
     # -----------------------------------------------------
@@ -587,6 +601,65 @@ class MundoBot(commands.Bot):
         audio_path = os.path.join(self.path, file_name)
         voice_client.play(dc.FFmpegPCMAudio(audio_path))
 
+    # -----------------------------------------------------
+    # PERIODIC CLASH MANAGEMENT METHODS
+    # -----------------------------------------------------
+    async def run_notifications(self) -> None:
+        """Gets all overdue notifications and sends them out."""
+        overdue_clashes = self.clash_manager.get_overdue_notifications()
+
+        for clash_entry in overdue_clashes:
+            clash = from_dict(Clash, clash_entry)
+            guild: dc.Guild = self.get_guild(clash.guild_id)
+            clash_channel: dc.TextChannel = guild.get_channel(clash.clash_channel_id)
+            players = self.clash_manager.players_for_clash(clash_entry["_id"])
+            print(helpers.get_notification(players, clash))
+            message: dc.Message = await clash_channel.send(
+                helpers.get_notification(players, clash)
+            )
+            clash.notification_message_ids.append(message.id)
+            self.clash_manager.update_notification_ids(
+                clash_entry["_id"], clash.notification_message_ids
+            )
+
+    async def load_clashes_for_guild(self, guild_id: int) -> None:
+        """Makes clashes for a guild consistent with list of clashes from Riot.
+
+        Args:
+            guild_id (int): Id of the guild to check.
+        """
+        guild = self.get_guild(guild_id)
+        clashes: List[ApiClash] = self.clash_api_service.get_clashes()
+        missing_clashes, surplus_clashes = self.clash_manager.get_needed_changes(
+            guild.id, clashes
+        )
+        print(missing_clashes, surplus_clashes)
+        missing_clashes.sort(key=lambda c: c.date)
+
+        for clash in missing_clashes:
+            await self.add_clash_internal(guild, clash.name, clash.date, clash.id)
+        for clash in surplus_clashes:
+            await self.remove_clash_internal(guild, clash.name)
+
+    async def run_clash_checking(self) -> None:
+        """Checks removes expired clashes and sends notification that should have been send."""
+        guild_ids = self.clash_manager.get_registered_server_ids()
+
+        for guild_id in guild_ids:
+            await self.load_clashes_for_guild(guild_id)
+
+        await self.run_notifications()
+
+    # -----------------------------------------------------
+    # SINGLETON METHODS
+    # -----------------------------------------------------
+    async def gain_control(self) -> None:
+        """Gains control over singleton and schedules periodic tasks."""
+        self.is_singleton = True
+        await self.run_clash_checking()
+
+        self.job = schedule.every(1).hours.do(self.run_clash_checking)
+
     async def check_for_singleton(self) -> None:
         """Checks for singleton property in database.
         Makes itself the singleton in case the old one is not refreshed.
@@ -603,6 +676,7 @@ class MundoBot(commands.Bot):
                         + timedelta(minutes=LOCK_REFRESH_TIMEOUT),
                     }
                 )
+                await self.gain_control()
             elif current_value["singleton_id"] == self.identifier:
                 print("Refreshing singleton lock")
                 new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
@@ -610,7 +684,8 @@ class MundoBot(commands.Bot):
                     {"_id": current_value["_id"]},
                     {"$set": {"valid_until": new_time}},
                 )
-            elif datetime.now() > current_value.valid_until:
+            elif datetime.now() > current_value["valid_until"]:
+                print("Gaining singleton lock")
                 new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
                 self.singleton_collection.update_one(
                     {"_id": current_value["_id"]},
@@ -621,24 +696,20 @@ class MundoBot(commands.Bot):
                         }
                     },
                 )
+                await self.gain_control()
+            else:
+                print("Waiting for singleton clearing")
+                if self.is_singleton:
+                    print("Losing singleton instance")
+                    self.is_singleton = False
+                    if self.job is not None:
+                        schedule.cancel_job(self.job)
+
             await asyncio.sleep(LOCK_CHECK_TIMEOUT)
 
     # # -----------------------------------------------------
     # # CLASH CONSISTENCY CHECKS TO BE RUN AT THE LOGIN
     # # -----------------------------------------------------
-    # async def check_expired_clashes(self) -> None:
-    #     """Checks if any clasches are expired and removes them.
-    #     WILL BECOME DEPRECATED.
-    #     """
-    #     clash: Clash
-
-    #     print("Checking expired clashes")
-
-    #     # Gets expired clashes from clash_manager
-    #     expired = self.clash_manager.check_clashes()
-    #     for clash in expired.values():
-    #         await self.delete_clash(clash)
-
     # async def check_positions(self) -> None:
     #     """Checks if positions of players in the clash match positions stored in ClashManager."""
     #     clash: Clash

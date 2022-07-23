@@ -1,5 +1,5 @@
 """Module providing classes of Clashmanager that manages stored Clashes."""
-import datetime
+from datetime import datetime
 from dataclasses import asdict
 from typing import Any, Dict, List, Tuple
 
@@ -18,24 +18,8 @@ class ClashManager:
         self.client = client
         self.clashes: collection.Collection = client.clash.clashes
         self.positions: collection.Collection = client.clash.positions
+        self.notifications: collection.Collection = client.clash.notifications
         self.registered_servers: collection.Collection = client.clash.registered_servers
-
-    def check_clashes(self) -> List[Clash]:
-        """Finds all clashes that are expired and pops them from the DB.
-
-        Returns:
-            List[Clash]: Popped expired clashes.
-        """
-
-        expired_clashes: List[Clash] = []
-        for expired_clash_entry in self.clashes.find(
-            {"date": {"$lt": datetime.datetime.today()}}
-        ):
-            expired_clashes.append(from_dict(Clash, expired_clash_entry))
-            self.clashes.delete_one({"_id": expired_clash_entry["_id"]})
-            self.positions.delete_one({"clash_id": expired_clash_entry["_id"]})
-
-        return expired_clashes
 
     def clashes_for_guild(self, guild_id: int) -> cursor.Cursor:
         """Gets all clashes present for a given guild.
@@ -78,7 +62,9 @@ class ClashManager:
         except KeyError:
             return None
 
-    def add_clash(self, clash: Clash) -> None:
+    def add_clash(
+        self, clash: Clash, notification_times: List[datetime] = None
+    ) -> None:
         """Adds clash to list of clashes.
 
         Args:
@@ -86,6 +72,20 @@ class ClashManager:
         """
         result = self.clashes.insert_one(asdict(clash))
         self.positions.insert_one({"clash_id": result.inserted_id, "players": {}})
+
+        if notification_times is None or not isinstance(notification_times, list):
+            return
+
+        self.notifications.insert_many(
+            [
+                {
+                    "clash_id": result.inserted_id,
+                    "time": x,
+                    "notified": False,
+                }
+                for x in notification_times
+            ]
+        )
 
     def remove_clash(self, clash_name: str, guild_id: int) -> Clash:
         """Removes clash with given name and returns it.
@@ -103,6 +103,7 @@ class ClashManager:
         if result is None:
             return None
         self.positions.delete_one({"clash_id": result["_id"]})
+        self.notifications.delete_many({"clash_id": result["_id"]})
         return from_dict(Clash, result)
 
     def register_player(
@@ -154,7 +155,7 @@ class ClashManager:
             Tuple[List[ApiClash], List[Clash]]: List of not present clashes
             and a list of surplus clashes.
         """
-        missing_names = list(map(lambda c: c.name, confirmed_clashes))
+        missing_names = [c.name for c in confirmed_clashes]
         surplus_clashes = []
         all_clashes = self.clashes.find({"guild_id": guild_id})
         for clash in all_clashes:
@@ -194,3 +195,43 @@ class ClashManager:
         """
         deleted_server = self.registered_servers.delete_one({"server_id": server_id})
         return deleted_server.deleted_count > 0
+
+    def get_registered_server_ids(self) -> List[int]:
+        """Gets ids of all servers that are registered for clash updates.
+
+        Returns:
+            List[int]: List of ids of registered servers.
+        """
+        return [self.registered_servers.find()]
+
+    def get_overdue_notifications(self) -> cursor.Cursor:
+        """Gets all unique Clash instances that have overdue notifications.
+
+        Returns:
+            cursor.Cursor: Cursor of clashes that have overdue notification.
+        """
+        overdue_notifications = self.notifications.find(
+            {"time": {"$lt": datetime.now()}, "notified": False}
+        )
+        clashes = self.clashes.find(
+            {"_id": {"$in": overdue_notifications.distinct("clash_id")}}
+        )
+        ids = [notification["_id"] for notification in overdue_notifications]
+        self.notifications.update_many(
+            {"_id": {"$in": ids}}, {"$set": {"notified": True}}
+        )
+        return clashes
+
+    def update_notification_ids(
+        self, clash_id: int, notification_message_ids: List[int]
+    ) -> None:
+        """Updates notification message ids array of a clash.
+
+        Args:
+            clash_id (int): Id of the clash to update.
+            notification_message_ids (List[int]): New list of notification message ids.
+        """
+        self.clashes.update_one(
+            {"_id": clash_id},
+            {"$set": {"notification_message_ids": notification_message_ids}},
+        )

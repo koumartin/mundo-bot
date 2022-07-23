@@ -1,7 +1,7 @@
 """Module providing Clash dataclass for storing League clash data."""
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import datetime
-from typing import List
+from typing import List, Optional
 
 
 @dataclass
@@ -16,8 +16,8 @@ class Clash:
     message_id: int
     role_id: int
     status_id: int
-    notification_message_ids: List[int] = []
-    riot_id: int = None
+    notification_message_ids: List[int] = field(default_factory=lambda: [])
+    riot_id: Optional[int] = None
     date: datetime.datetime = None
 
     def __post_init__(self):

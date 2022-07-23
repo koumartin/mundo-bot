@@ -1,19 +1,34 @@
 """Module of helper functions for MundoBot."""
-from typing import Dict
+from datetime import datetime, timedelta
+from typing import Dict, List
 import discord as dc
 from mundobot.position import Position
+from mundobot.clash import Clash
 
 
-def find_clash_channel(guild: dc.Guild) -> dc.TextChannel:
-    """Finds a channel named clash in the guild.
+# Predefined times at which notifications for clash will happen
+NOTIFICATION_DELTAS = [
+    timedelta(days=-6, hours=-12),  # Week before at noon
+    timedelta(days=-1, hours=-12),  # Two days before at noon
+    timedelta(hours=9),  # Same day in the morning
+]
+
+
+def find_text_channel_by_name(guild: dc.Guild, name: str) -> dc.TextChannel:
+    """Finds text channel with given name in guild.
 
     Args:
-        guild (dc.Guild): Guild to find the channel in.
+        guild (dc.Guild): Guild to search in.
+        name (str): Name of the channel to search for.
 
     Returns:
-        dc.TextChannel: Clash text channel.
+        dc.TextChannel: Text channel that is found or None if no exists.
     """
-    return next((c for c in guild.text_channels if c.name == "clash"), None)
+    name = name.replace(" ", "-").lower()
+    return next(
+        (c for c in guild.text_channels if c.name == name),
+        None,
+    )
 
 
 async def conditional_delete(message: dc.Message) -> None:
@@ -103,3 +118,69 @@ async def remove_reactions(
             for user in users:
                 if user == target_user:
                     await message.remove_reaction(reaction.emoji, target_user)
+
+
+def prepare_notification_times(clash: Clash) -> List[datetime]:
+    """Calculates times for clash notifications.
+
+    Args:
+        clash (Clash): Clash for which notofication should be created.
+
+    Returns:
+        List[datetime]: List of notification times.
+    """
+    clash_time = clash.date
+    return [clash_time + delta for delta in NOTIFICATION_DELTAS]
+
+
+def get_notification(players: Dict[str, str], clash: Clash) -> str:
+    """Gets notification message for a clash.
+
+    Args:
+        players (Dict[str, str]): List of players registered for the clash.
+        clash (Clash): Clash instance for which the notification is made.
+
+    Returns:
+        str: Notification string.
+    """
+    # Prepare time to the clash
+    approximate_start_time = clash.date + timedelta(hours=21)
+    remaining_time = approximate_start_time - datetime.now()
+    remaining_hours = remaining_time.seconds // (60 * 60)
+    remaining_time -= timedelta(hours=remaining_hours)
+    remaining_minutes = remaining_time.seconds // 60
+    remaining_time -= timedelta(minutes=remaining_minutes)
+
+    # Prepare missing positions
+    missing_positions = list(Position)
+    missing_positions.remove(Position.FILL)
+    missing_positions.remove(Position.NOOB)
+    for position_str in players.values():
+        position = Position[position_str]
+        if position in missing_positions:
+            missing_positions.remove(position)
+
+    output = (
+        f"Clash {clash.name} začíná za zhruba {remaining_time.days} dní, "
+        + f"{remaining_hours}hodin a {remaining_minutes} minut.\n"
+    )
+    unique_players = set(
+        player
+        for player, position in players.items()
+        if Position[position] != Position.NOOB
+    )
+    connection = ("je", "") if len(unique_players) == 1 else ("jsou", "i")
+
+    if len(unique_players) < 5:
+        output += (
+            f"Stále není dost hráčů. Aktuálně {connection[0]} "
+            + f"přihlášen{connection[1]} pouze {len(unique_players)} hráč{connection[1]}.\n"
+        )
+    if len(missing_positions) > 0:
+        output += "Stále chybí hráči na pozice: \n"
+        for position in missing_positions:
+            output += str(position) + " "
+    else:
+        output += "Všechny pozice jsou zaplněny, takže pouze připomínám."
+
+    return output
