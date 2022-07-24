@@ -4,6 +4,7 @@ Mundo bot class and commands for running it.
 import asyncio
 import os
 import queue
+import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID, getnode
@@ -29,6 +30,7 @@ from mundobot import helpers
 
 LOCK_REFRESH_TIMEOUT = 5  # minutes
 LOCK_CHECK_TIMEOUT = 4 * 60  # 5 minutes
+LOCK_CHECK_TIMEOUT_INITIAL = 5
 
 
 class MundoBot(commands.Bot):
@@ -73,6 +75,16 @@ class MundoBot(commands.Bot):
         self.job: schedule.Job = None
         self.singleton_collection = self.client.bot.singleton
 
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(logging.INFO)
+        file_handler = logging.FileHandler(
+            self.path + "/log/" + "bot_log_" + datetime.now().strftime("%Y-%m-%d_%H:%M")
+        )
+        file_handler.setLevel(logging.WARNING)
+        self.logger = logging.getLogger("bot_logger")
+        self.logger.addHandler(console_handler)
+        self.logger.addHandler(file_handler)
+
         self.add_all_commands()
 
     def start_running(self) -> None:
@@ -87,11 +99,10 @@ class MundoBot(commands.Bot):
         # -----------------------------------------------------
         @self.event
         async def on_ready() -> None:
-            # await self.check_expired_clashes()
-            # await self.check_positions()
-            print("Logged in.")
+            self.logger.info("Logged in.")
 
         @self.event
+        @self.single_handle()
         async def on_voice_state_update(
             member: dc.Member, before: dc.VoiceState, after: dc.VoiceState
         ) -> None:
@@ -109,13 +120,18 @@ class MundoBot(commands.Bot):
 
             # Check if the state update was joining a room
             if before.channel != after.channel and after.channel is not None:
-                print(
-                    f"{member} from channel {before.channel} to \
-                       {after.channel} in {after.channel.guild}"
+                self.logger.info(
+                    "%s from channel %s to \
+                       %s in %s",
+                    member,
+                    before.channel,
+                    after.channel,
+                    after.channel.guild,
                 )
                 await self.add_to_queue(member.guild, after.channel)
 
         @self.event
+        @self.single_handle()
         async def on_raw_reaction_add(reaction: dc.RawReactionActionEvent) -> None:
             """Action triggered every time a user adds a reaction to a message.
             If the message is in relevant channel, than clash role is assigned.
@@ -166,6 +182,7 @@ class MundoBot(commands.Bot):
                 break
 
         @self.event
+        @self.single_handle()
         async def on_raw_reaction_remove(reaction: dc.RawReactionActionEvent) -> None:
             """Action triggered every time a user removes theire reaction to a message.
             If the reaction is in relevant channel, than a role in clash is removed.
@@ -213,6 +230,7 @@ class MundoBot(commands.Bot):
         # MUNDO GREET COMMANDS
         # -----------------------------------------------------
         @self.command()
+        @self.single_handle()
         async def mundo(ctx: Context, num: int = 1) -> None:
             """Commands the bot to come into users channel and repeat num times a greeting.
 
@@ -220,14 +238,16 @@ class MundoBot(commands.Bot):
                 ctx (Context): Context of the command.
                 num (int, optional): Numbrer of greetings commanded. Defaults to 1.
             """
-            # Guard for receiving command from DMChannel
-            if not isinstance(ctx.channel, dc.TextChannel):
-                await ctx.author.send("Mundo can't greet without real channel.")
-                return
+            # Guard for receiving command
+            # if not isinstance(ctx.author.voice, dc.TextChannel):
+            #     await ctx.author.send("Mundo can't greet without real channel.")
+            #     return
 
-            await ctx.message.delete()
+            await helpers.conditional_delete(ctx.message)
 
-            print(ctx.author, "called !mundo with n =", num, "in", ctx.guild)
+            self.logger.info(
+                "%s called !mundo with n = %d in %s", ctx.author, num, ctx.guild
+            )
 
             if num > 30:
                 await ctx.author.send(
@@ -251,6 +271,7 @@ class MundoBot(commands.Bot):
                 await ctx.author.send("Mundo can't greet without voice channel.")
 
         @self.command()
+        @self.single_handle()
         async def shutup(ctx: Context, additional: str = "") -> None:
             """Commands the bot to stop repeating greetings after ending current one.
             Users without TODO permission have to add please parameter.
@@ -265,7 +286,7 @@ class MundoBot(commands.Bot):
             guild = ctx.guild
             voice_client = dc.utils.get(self.voice_clients, guild=guild)
 
-            print(ctx.author, "called !shutup in", ctx.guild)
+            self.logger.info("%s called !shutup in %s", ctx.author, ctx.guild)
 
             if additional.lower() == "please" or additional.lower() == "prosím":
                 await ctx.author.send(
@@ -284,10 +305,13 @@ class MundoBot(commands.Bot):
         # CLASH COMMANDS
         # -----------------------------------------------------
         @self.command()
+        @self.single_handle()
         async def add_clash(ctx: Context, clash_name: str, date: str) -> None:
             """Adds clash to the list of registered clashes and creates a
             channel, role and registration message for it.
-            WILL BECOME DEPRECATED
+
+            DEPRECATED
+            ---
 
             Args:
                 ctx (Context): Context of the command.
@@ -299,13 +323,19 @@ class MundoBot(commands.Bot):
             if not await helpers.check_permissions(ctx.author):
                 return
 
+            self.logger.info(
+                "%s added clash %s on %s in %s", ctx.author, clash_name, date, ctx.guild
+            )
+
             await self.add_clash_internal(ctx.guild, clash_name, date, ctx.author)
 
         @self.command()
+        @self.single_handle()
         async def remove_clash(ctx: Context, clash_name: str) -> None:
             """Removes clash and all asociated lists, channels and roles.
-            WILL BECOME DEPRECATED
 
+            DEPRECATED
+            ---
 
             Args:
                 ctx (Context): Context of the command.
@@ -316,9 +346,14 @@ class MundoBot(commands.Bot):
             if not await helpers.check_permissions(ctx.author):
                 return
 
+            self.logger.info(
+                "%s removed clash %s in %s", ctx.author, clash_name, ctx.guild
+            )
+
             await self.remove_clash_internal(ctx.guild, clash_name)
 
         @self.command()
+        @self.single_handle()
         async def load_clashes(ctx: Context) -> None:
             """Loads clashes for callers server.
 
@@ -330,10 +365,13 @@ class MundoBot(commands.Bot):
             if not await helpers.check_permissions(ctx.author):
                 return
 
+            self.logger.info("%s loaded clashes for %s", ctx.author, ctx.guild)
+
             guild: dc.Guild = ctx.guild
             self.load_clashes_for_guild(guild.id)
 
         @self.command()
+        @self.single_handle()
         async def register_server(ctx: Context) -> None:
             """Registers a clash server to receive notifications about clashes.
 
@@ -348,12 +386,16 @@ class MundoBot(commands.Bot):
             success = self.clash_manager.register_server(ctx.guild.id)
             if success:
                 await ctx.channel.send("Server now receive clash updates.")
+                self.logger.info(
+                    "%s registered %s for clash updates", ctx.author, ctx.guild
+                )
             else:
                 await ctx.author.send(
                     "You already receive clash updates. Me no do things two, me no stupid."
                 )
 
         @self.command()
+        @self.single_handle()
         async def unregister_server(ctx: Context) -> None:
             """Unregisters a clash server from receiving notifications about clashes.
 
@@ -368,19 +410,24 @@ class MundoBot(commands.Bot):
             success = self.clash_manager.unregister_server(ctx.guild.id)
             if success:
                 await ctx.channel.send("Server now no receive clash updates.")
+                self.logger.info(
+                    "%s unregistered %s for clash updates", ctx.author, ctx.guild
+                )
             else:
                 await ctx.author.send(
                     "You not receive clash updates. Me no stupid to remove something no existing."
                 )
 
         @self.command()
+        @self.single_handle()
         async def test(ctx: Context) -> None:
             """Testing function
 
             Args:
                 ctx (Context): Context of the command.
             """
-            print(ctx.guild.roles)
+            print([c.name for c in self.commands])
+            print(ctx.guild.id)
 
     # -----------------------------------------------------
     # HELPER FUNCTION FOR CLASH INSTANCES
@@ -409,6 +456,7 @@ class MundoBot(commands.Bot):
         # Sends message to designated channel and also gets clash_channel
         clash_channel = helpers.find_text_channel_by_name(guild, "clash")
         if clash_channel is None:
+            self.logger.warning("%s is missing clash channel.", guild)
             if user is not None:
                 await user.send("Mundo need clash text channel.")
             else:
@@ -613,7 +661,6 @@ class MundoBot(commands.Bot):
             guild: dc.Guild = self.get_guild(clash.guild_id)
             clash_channel: dc.TextChannel = guild.get_channel(clash.clash_channel_id)
             players = self.clash_manager.players_for_clash(clash_entry["_id"])
-            print(helpers.get_notification(players, clash))
             message: dc.Message = await clash_channel.send(
                 helpers.get_notification(players, clash)
             )
@@ -633,7 +680,6 @@ class MundoBot(commands.Bot):
         missing_clashes, surplus_clashes = self.clash_manager.get_needed_changes(
             guild.id, clashes
         )
-        print(missing_clashes, surplus_clashes)
         missing_clashes.sort(key=lambda c: c.date)
 
         for clash in missing_clashes:
@@ -665,10 +711,11 @@ class MundoBot(commands.Bot):
         Makes itself the singleton in case the old one is not refreshed.
         Refreshes if currently being singleton.
         """
+        await asyncio.sleep(LOCK_CHECK_TIMEOUT_INITIAL)
         while True:
             current_value = self.singleton_collection.find_one()
             if not current_value["singleton_id"]:
-                print("Initializing singleton")
+                self.logger.info("Initializing singleton")
                 self.singleton_collection.insert_one(
                     {
                         "singleton_id": self.identifier,
@@ -678,14 +725,16 @@ class MundoBot(commands.Bot):
                 )
                 await self.gain_control()
             elif current_value["singleton_id"] == self.identifier:
-                print("Refreshing singleton lock")
+                self.logger.info("Refreshing singleton lock")
                 new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
                 self.singleton_collection.update_one(
                     {"_id": current_value["_id"]},
                     {"$set": {"valid_until": new_time}},
                 )
+                if not self.is_singleton:
+                    await self.gain_control()
             elif datetime.now() > current_value["valid_until"]:
-                print("Gaining singleton lock")
+                self.logger.info("Gaining singleton lock")
                 new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
                 self.singleton_collection.update_one(
                     {"_id": current_value["_id"]},
@@ -698,14 +747,22 @@ class MundoBot(commands.Bot):
                 )
                 await self.gain_control()
             else:
-                print("Waiting for singleton clearing")
+                self.logger.info("Waiting for singleton clearing")
                 if self.is_singleton:
-                    print("Losing singleton instance")
+                    self.logger.info("Losing singleton instance")
                     self.is_singleton = False
                     if self.job is not None:
                         schedule.cancel_job(self.job)
 
             await asyncio.sleep(LOCK_CHECK_TIMEOUT)
+
+    def single_handle(self):
+        """Decorator that allows to check if instance is singleton holder."""
+
+        async def single_handle_check(_):
+            return self.is_singleton
+
+        return commands.check(single_handle_check)
 
     # # -----------------------------------------------------
     # # CLASH CONSISTENCY CHECKS TO BE RUN AT THE LOGIN

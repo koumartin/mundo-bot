@@ -202,7 +202,7 @@ class ClashManager:
         Returns:
             List[int]: List of ids of registered servers.
         """
-        return [self.registered_servers.find()]
+        return [result["server_id"] for result in self.registered_servers.find()]
 
     def get_overdue_notifications(self) -> cursor.Cursor:
         """Gets all unique Clash instances that have overdue notifications.
