@@ -187,9 +187,27 @@ def get_notification(players: Dict[str, str], clash: Clash) -> str:
 
     return output
 
-def prepare_logging(path: Optional[str]=None, console_level: Optional[int]=None, file_level: Optional[int]=None) -> logging.Logger:
+
+def prepare_logging(
+    path: Optional[str] = None,
+    console_level: Optional[int] = None,
+    file_level: Optional[int] = None,
+) -> logging.Logger:
+    """Prepares console and file logger with given level.
+    If level is not provided than logger is not created.
+
+    Args:
+        path (Optional[str], optional): Path for file logging. Defaults to None.
+        console_level (Optional[int], optional): Level of console logger. Defaults to None.
+        file_level (Optional[int], optional): Level of file logger. Defaults to None.
+
+    Returns:
+        logging.Logger: Final logger.
+    """
     logger = logging.getLogger("bot_logger")
-    formatter = logging.Formatter("[%(levelname)s %(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter(
+        "[%(levelname)s %(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+    )
     logger.setLevel(logging.DEBUG)
     if console_level is not None:
         console_handler = logging.StreamHandler()
@@ -207,5 +225,5 @@ def prepare_logging(path: Optional[str]=None, console_level: Optional[int]=None,
         file_handler.setLevel(file_level)
         file_handler.setFormatter(formatter)
         logger.addHandler(file_handler)
-    
+
     return logger

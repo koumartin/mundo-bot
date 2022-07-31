@@ -5,7 +5,6 @@ import asyncio
 import os
 import queue
 import logging
-import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID, getnode
