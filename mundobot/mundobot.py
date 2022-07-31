@@ -8,6 +8,7 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID, getnode
+import certifi
 
 import discord as dc
 from dacite import from_dict
@@ -64,7 +65,7 @@ class MundoBot(commands.Bot):
         self.playback_queue_handle: Dict[dc.Guild, Tuple[bool, bool]] = {}
 
         self.client = MongoClient(
-            mongodbConnectionString, uuidRepresentation="standard"
+            mongodbConnectionString, uuidRepresentation="standard", tlsCAFile=certifi.where()
         )
         self.clash_manager = ClashManager(self.client)
         self.accepted_reactions = Position.accepted_reactions()
@@ -707,7 +708,9 @@ class MundoBot(commands.Bot):
         """
         await asyncio.sleep(LOCK_CHECK_TIMEOUT_INITIAL)
         while True:
+            self.logger.debug("here")
             current_value = self.singleton_collection.find_one()
+            self.logger.debug(current_value)
             if not current_value["singleton_id"]:
                 self.logger.info("Initializing singleton")
                 self.singleton_collection.insert_one(
