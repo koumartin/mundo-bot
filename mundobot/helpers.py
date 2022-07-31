@@ -189,7 +189,7 @@ def get_notification(players: Dict[str, str], clash: Clash) -> str:
 
 def prepare_logging(path: Optional[str]=None, console_level: Optional[int]=None, file_level: Optional[int]=None) -> logging.Logger:
     logger = logging.getLogger("bot_logger")
-    formatter = logging.Formatter("[%(levelname)s  %(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    formatter = logging.Formatter("[%(levelname)s %(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
     logger.setLevel(logging.DEBUG)
     if console_level is not None:
         console_handler = logging.StreamHandler()
@@ -201,7 +201,7 @@ def prepare_logging(path: Optional[str]=None, console_level: Optional[int]=None,
         if not os.path.exists(log_path):
             os.makedirs(log_path)
         file_handler = logging.FileHandler(
-            log_path + "bot_log_" + datetime.now().strftime("%Y-%m-%d_%H:%M"),
+            log_path + "bot_log_" + datetime.now().strftime("%Y-%m-%d_%H:%M:%S"),
             "w",
         )
         file_handler.setLevel(file_level)
