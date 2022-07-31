@@ -5,6 +5,7 @@ import asyncio
 import os
 import queue
 import logging
+import sys
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID, getnode
@@ -70,21 +71,12 @@ class MundoBot(commands.Bot):
         self.accepted_reactions = Position.accepted_reactions()
         self.clash_api_service = ClashApiService()
 
-        self.identifier: UUID = getnode()
+        self.identifier: UUID = UUID(int=getnode())
         self.is_singleton = False
-        self.job: schedule.Job = None
+        self.job: Optional[schedule.Job] = None
         self.singleton_collection = self.client.bot.singleton
 
-        console_handler = logging.StreamHandler()
-        console_handler.setLevel(logging.INFO)
-        file_handler = logging.FileHandler(
-            self.path + "/log/" + "bot_log_" + datetime.now().strftime("%Y-%m-%d_%H:%M")
-        )
-        file_handler.setLevel(logging.WARNING)
-        self.logger = logging.getLogger("bot_logger")
-        self.logger.addHandler(console_handler)
-        self.logger.addHandler(file_handler)
-
+        self.logger = helpers.prepare_logging(self.path, logging.DEBUG, logging.WARNING)
         self.add_all_commands()
 
     def start_running(self) -> None:
@@ -236,7 +228,7 @@ class MundoBot(commands.Bot):
 
             Args:
                 ctx (Context): Context of the command.
-                num (int, optional): Numbrer of greetings commanded. Defaults to 1.
+                num (int, optional): Number of greetings commanded. Defaults to 1.
             """
             # Guard for receiving command
             # if not isinstance(ctx.author.voice, dc.TextChannel):
@@ -368,7 +360,7 @@ class MundoBot(commands.Bot):
             self.logger.info("%s loaded clashes for %s", ctx.author, ctx.guild)
 
             guild: dc.Guild = ctx.guild
-            self.load_clashes_for_guild(guild.id)
+            await self.load_clashes_for_guild(guild.id)
 
         @self.command()
         @self.single_handle()
@@ -443,8 +435,11 @@ class MundoBot(commands.Bot):
         """Adds clash and generates roles, channels and messages for it.
 
         Args:
+            guild (dc.Guild): Guild for which the clash is created.
             clash_name (str): Name of the clash.
             date (str): Date of the clash
+            user (Optional[dc.Member]): User which will receive error and whose permissions will be the baseline.
+            riot_id (Optional[int]): Id of clash in riot database.
         """
         # Convert date from iso format if necessary
         try:

@@ -1,6 +1,8 @@
 """Module of helper functions for MundoBot."""
 from datetime import datetime, timedelta
-from typing import Dict, List
+import logging
+import os
+from typing import Dict, List, Optional
 import discord as dc
 from mundobot.position import Position
 from mundobot.clash import Clash
@@ -184,3 +186,26 @@ def get_notification(players: Dict[str, str], clash: Clash) -> str:
         output += "Všechny pozice jsou zaplněny, takže pouze připomínám."
 
     return output
+
+def prepare_logging(path: Optional[str]=None, console_level: Optional[int]=None, file_level: Optional[int]=None) -> logging.Logger:
+    logger = logging.getLogger("bot_logger")
+    formatter = logging.Formatter("[%(levelname)s  %(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+    logger.setLevel(logging.DEBUG)
+    if console_level is not None:
+        console_handler = logging.StreamHandler()
+        console_handler.setLevel(console_level)
+        console_handler.setFormatter(formatter)
+        logger.addHandler(console_handler)
+    if file_level is not None:
+        log_path = path + "/log/"
+        if not os.path.exists(log_path):
+            os.makedirs(log_path)
+        file_handler = logging.FileHandler(
+            log_path + "bot_log_" + datetime.now().strftime("%Y-%m-%d_%H:%M"),
+            "w",
+        )
+        file_handler.setLevel(file_level)
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+    
+    return logger

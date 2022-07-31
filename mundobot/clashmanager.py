@@ -125,7 +125,7 @@ class ClashManager:
             return_document=collection.ReturnDocument.AFTER,
         )["players"]
 
-    def unregister_player(self, clash_id: str, player_name: str) -> Dict[str, Any]:
+    def unregister_player(self, clash_id: int, player_name: str) -> Dict[str, Any]:
         """Unregisters player from clash.
 
         Args:
