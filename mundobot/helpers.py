@@ -219,7 +219,7 @@ def prepare_logging(
         if not os.path.exists(log_path):
             os.makedirs(log_path)
         file_handler = logging.FileHandler(
-            log_path + "bot_log_" + datetime.now().strftime("%Y-%m-%d_%H:%M:%S"),
+            log_path + "bot_log_" + datetime.now().strftime("%Y-%m-%d_%H-%M-%S"),
             "w",
         )
         file_handler.setLevel(file_level)

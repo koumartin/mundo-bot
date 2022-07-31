@@ -708,9 +708,7 @@ class MundoBot(commands.Bot):
         """
         await asyncio.sleep(LOCK_CHECK_TIMEOUT_INITIAL)
         while True:
-            self.logger.debug("here")
             current_value = self.singleton_collection.find_one()
-            self.logger.debug(current_value)
             if not current_value["singleton_id"]:
                 self.logger.info("Initializing singleton")
                 self.singleton_collection.insert_one(
