@@ -2,10 +2,10 @@
 Mundo bot class and commands for running it.
 """
 import asyncio
-from asyncio.log import logger
 import os
 import queue
 import logging
+import signal
 from datetime import datetime, timedelta
 import sys
 import traceback
@@ -32,8 +32,9 @@ from mundobot import helpers
 # Date: 22/3/2021
 # -------------------------------------------
 
-LOCK_REFRESH_TIMEOUT = 5  # minutes
-LOCK_CHECK_TIMEOUT = 4 * 60  # 5 minutes
+LOCK_REFRESH_TIMEOUT = 1.5  # minutes
+LOCK_CHECK_TIMEOUT = 4 * 60  # 4 minutes
+LOCK_CHECK_TIMEOUT_OWNER = 60
 LOCK_CHECK_TIMEOUT_INITIAL = 5
 
 
@@ -68,7 +69,9 @@ class MundoBot(commands.Bot):
         self.playback_queue_handle: Dict[dc.Guild, Tuple[bool, bool]] = {}
 
         self.client = MongoClient(
-            mongodbConnectionString, uuidRepresentation="standard", tlsCAFile=certifi.where()
+            mongodbConnectionString,
+            uuidRepresentation="standard",
+            tlsCAFile=certifi.where(),
         )
         self.clash_manager = ClashManager(self.client)
         self.accepted_reactions = Position.accepted_reactions()
@@ -76,15 +79,17 @@ class MundoBot(commands.Bot):
 
         self.identifier: UUID = UUID(int=getnode())
         self.is_singleton = False
+        self.checking_done = False
         self.job: Optional[schedule.Job] = None
         self.singleton_collection = self.client.bot.singleton
 
         self.logger = helpers.prepare_logging(self.path, logging.DEBUG, logging.WARNING)
+        signal.signal(signal.SIGTERM, self.on_termination)
         self.add_all_commands()
 
     def start_running(self) -> None:
         """Commands the bot to log in and start running using its api token."""
-        self.loop.create_task(self.check_for_singleton())
+        self.loop.create_task(self.check_for_singleton_job())
         self.run(self.token)
 
     def add_all_commands(self) -> None:
@@ -97,12 +102,20 @@ class MundoBot(commands.Bot):
             self.logger.info("Logged in.")
 
         @self.event
-        async def on_command_error(ctx: Context, error: commands.CommandError):
+        async def on_command_error(ctx: Context, error: commands.CommandError) -> None:
+            """Changes the behaviour of command error to ignore CheckFailures.
+
+            Args:
+                ctx (Context): Context of the failing command.
+                error (commands.CommandError): Command error instance.
+            """
             if isinstance(error, commands.errors.CheckFailure):
                 pass
             else:
-                self.logger.error("Ignoring exception in command {}".forma(ctx.command))
-                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+                self.logger.error("Ignoring exception in command %s", ctx.command)
+                traceback.print_exception(
+                    type(error), error, error.__traceback__, file=sys.stderr
+                )
 
         @self.event
         async def on_voice_state_update(
@@ -711,70 +724,97 @@ class MundoBot(commands.Bot):
     # -----------------------------------------------------
     # SINGLETON METHODS
     # -----------------------------------------------------
+    def set_checking_not_done(self):
+        """Sets checking done to false."""
+        self.checking_done = False
+
     async def gain_control(self) -> None:
         """Gains control over singleton and schedules periodic tasks."""
         self.is_singleton = True
-        await self.run_clash_checking()
+        self.job = schedule.every(1).hours.do(self.set_checking_not_done)
 
-        self.job = schedule.every(1).hours.do(self.run_clash_checking)
+    async def check_for_singleton(self, run_checking: bool) -> bool:
+        """Checks for singleton and refreshes it or gains it if possible."""
+        current_value = self.singleton_collection.find_one()
 
-    async def check_for_singleton(self) -> None:
+        # Uninitialized singleton is initialized and singleton lock is gained
+        if current_value is None or not current_value["singleton_id"]:
+            self.logger.info("Initializing singleton")
+            self.singleton_collection.insert_one(
+                {
+                    "singleton_id": self.identifier,
+                    "valid_until": datetime.now()
+                    + timedelta(minutes=LOCK_REFRESH_TIMEOUT),
+                }
+            )
+            await self.gain_control()
+        # Singleton lock is held and refreshed
+        elif current_value["singleton_id"] == self.identifier:
+            self.logger.info("Refreshing singleton lock")
+            new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
+            self.singleton_collection.update_one(
+                {"_id": current_value["_id"]},
+                {"$set": {"valid_until": new_time}},
+            )
+            if not self.is_singleton:
+                await self.gain_control()
+        # Singleton lock is gained
+        elif datetime.now() > current_value["valid_until"]:
+            self.logger.info("Gaining singleton lock")
+            new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
+            self.singleton_collection.update_one(
+                {"_id": current_value["_id"]},
+                {
+                    "$set": {
+                        "singleton_id": self.identifier,
+                        "valid_until": new_time,
+                    }
+                },
+            )
+            await self.gain_control()
+        # Singleton lock is held by diffenet instance
+        else:
+            self.logger.info("Waiting for singleton clearing")
+            if self.is_singleton:
+                self.logger.info("Losing singleton instance")
+                self.is_singleton = False
+                if self.job is not None:
+                    schedule.cancel_job(self.job)
+
+        if run_checking and self.is_singleton and not self.checking_done:
+            await self.run_clash_checking()
+
+    async def check_for_singleton_job(self) -> None:
         """Checks for singleton property in database.
         Makes itself the singleton in case the old one is not refreshed.
         Refreshes if currently being singleton.
         """
         await asyncio.sleep(LOCK_CHECK_TIMEOUT_INITIAL)
         while True:
-            current_value = self.singleton_collection.find_one()
-            if not current_value["singleton_id"]:
-                self.logger.info("Initializing singleton")
-                self.singleton_collection.insert_one(
-                    {
-                        "singleton_id": self.identifier,
-                        "valid_until": datetime.now()
-                        + timedelta(minutes=LOCK_REFRESH_TIMEOUT),
-                    }
-                )
-                await self.gain_control()
-            elif current_value["singleton_id"] == self.identifier:
-                self.logger.info("Refreshing singleton lock")
-                new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
-                self.singleton_collection.update_one(
-                    {"_id": current_value["_id"]},
-                    {"$set": {"valid_until": new_time}},
-                )
-                if not self.is_singleton:
-                    await self.gain_control()
-            elif datetime.now() > current_value["valid_until"]:
-                self.logger.info("Gaining singleton lock")
-                new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
-                self.singleton_collection.update_one(
-                    {"_id": current_value["_id"]},
-                    {
-                        "$set": {
-                            "singleton_id": self.identifier,
-                            "valid_until": new_time,
-                        }
-                    },
-                )
-                await self.gain_control()
-            else:
-                self.logger.info("Waiting for singleton clearing")
-                if self.is_singleton:
-                    self.logger.info("Losing singleton instance")
-                    self.is_singleton = False
-                    if self.job is not None:
-                        schedule.cancel_job(self.job)
-
-            await asyncio.sleep(LOCK_CHECK_TIMEOUT)
+            await self.check_for_singleton(True)
+            await asyncio.sleep(
+                LOCK_CHECK_TIMEOUT
+                if not self.is_singleton
+                else LOCK_CHECK_TIMEOUT_OWNER
+            )
 
     def single_handle(self):
         """Decorator that allows to check if instance is singleton holder."""
 
         async def single_handle_check(_):
+            if not self.is_singleton:
+                self.check_for_singleton(False)
             return self.is_singleton
 
         return commands.check(single_handle_check)
+
+    def on_termination(self):
+        """Shortens own singleton lock during termination."""
+        if self.is_singleton:
+            self.singleton_collection.update_one(
+                {"_id": self.identifier},
+                {"$set": {"valid_until": datetime.now()}},
+            )
 
     # # -----------------------------------------------------
     # # CLASH CONSISTENCY CHECKS TO BE RUN AT THE LOGIN

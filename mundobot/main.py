@@ -1,3 +1,4 @@
+"""Main entry point for usual MundoBot usage utilizing environment variables for configuration."""
 import os
 from urllib.parse import quote_plus
 
