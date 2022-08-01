@@ -2,10 +2,13 @@
 Mundo bot class and commands for running it.
 """
 import asyncio
+from asyncio.log import logger
 import os
 import queue
 import logging
 from datetime import datetime, timedelta
+import sys
+import traceback
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID, getnode
 import certifi
@@ -94,7 +97,14 @@ class MundoBot(commands.Bot):
             self.logger.info("Logged in.")
 
         @self.event
-        @self.single_handle()
+        async def on_command_error(ctx: Context, error: commands.CommandError):
+            if isinstance(error, commands.errors.CheckFailure):
+                pass
+            else:
+                self.logger.error("Ignoring exception in command {}".forma(ctx.command))
+                traceback.print_exception(type(error), error, error.__traceback__, file=sys.stderr)
+
+        @self.event
         async def on_voice_state_update(
             member: dc.Member, before: dc.VoiceState, after: dc.VoiceState
         ) -> None:
@@ -106,6 +116,9 @@ class MundoBot(commands.Bot):
                 before (dc.VoiceState): Original voice state including channel.
                 after (dc.VoiceState): New voice state including channel.
             """
+            if not self.is_singleton:
+                return
+
             # Ignores himself moving
             if member == self.user:
                 return
@@ -123,7 +136,6 @@ class MundoBot(commands.Bot):
                 await self.add_to_queue(member.guild, after.channel)
 
         @self.event
-        @self.single_handle()
         async def on_raw_reaction_add(reaction: dc.RawReactionActionEvent) -> None:
             """Action triggered every time a user adds a reaction to a message.
             If the message is in relevant channel, than clash role is assigned.
@@ -131,6 +143,9 @@ class MundoBot(commands.Bot):
             Args:
                 reaction (dc.RawReactionActionEvent): Event of adding reaction
             """
+            if not self.is_singleton:
+                return
+
             # Checks if reaction was made on one of initial messages
             for clash_entry in self.clash_manager.clashes_for_guild(reaction.guild_id):
                 clash: Clash = from_dict(Clash, clash_entry)
@@ -174,7 +189,6 @@ class MundoBot(commands.Bot):
                 break
 
         @self.event
-        @self.single_handle()
         async def on_raw_reaction_remove(reaction: dc.RawReactionActionEvent) -> None:
             """Action triggered every time a user removes theire reaction to a message.
             If the reaction is in relevant channel, than a role in clash is removed.
@@ -182,6 +196,9 @@ class MundoBot(commands.Bot):
             Args:
                 reaction (dc.RawReactionActionEvent): Event of removing reaction.
             """
+            if not self.is_singleton:
+                return
+
             # Checks if reaction was made on one of initial messages
             for clash_entry in self.clash_manager.clashes_for_guild(reaction.guild_id):
                 clash: Clash = from_dict(Clash, clash_entry)
