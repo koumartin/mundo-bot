@@ -84,7 +84,6 @@ class MundoBot(commands.Bot):
         self.singleton_collection = self.client.bot.singleton
 
         self.logger = helpers.prepare_logging(self.path, logging.DEBUG, logging.WARNING)
-        signal.signal(signal.SIGTERM, self.on_termination)
         self.add_all_commands()
 
     def start_running(self) -> None:
@@ -100,6 +99,11 @@ class MundoBot(commands.Bot):
         @self.event
         async def on_ready() -> None:
             self.logger.info("Logged in.")
+            for signame in ("SIGINT", "SIGTERM"):
+                self.loop.add_signal_handler(
+                    getattr(signal, signame),
+                    lambda: asyncio.create_task(self.termination_handler()),
+                )
 
         @self.event
         async def on_command_error(ctx: Context, error: commands.CommandError) -> None:
@@ -808,13 +812,15 @@ class MundoBot(commands.Bot):
 
         return commands.check(single_handle_check)
 
-    def on_termination(self):
+    async def termination_handler(self):
         """Shortens own singleton lock during termination."""
+        self.logger.info("Terminating bot. Shortening singleton lock time.")
         if self.is_singleton:
             self.singleton_collection.update_one(
-                {"_id": self.identifier},
+                {},
                 {"$set": {"valid_until": datetime.now()}},
             )
+        await self.close()
 
     # # -----------------------------------------------------
     # # CLASH CONSISTENCY CHECKS TO BE RUN AT THE LOGIN
