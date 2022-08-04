@@ -83,7 +83,12 @@ class MundoBot(commands.Bot):
         self.job: Optional[schedule.Job] = None
         self.singleton_collection = self.client.bot.singleton
 
-        self.logger = helpers.prepare_logging(self.path, logging.DEBUG, logging.WARNING)
+        self.logger = helpers.prepare_logging(
+            "bot",
+            logging.DEBUG,
+            logging.WARNING,
+            self.path,
+        )
         self.add_all_commands()
 
     def start_running(self) -> None:
@@ -194,7 +199,7 @@ class MundoBot(commands.Bot):
                     await reaction.member.add_roles(role)
 
                 new_positions = self.clash_manager.register_player(
-                    clash_id, reaction.member.name, position
+                    clash_id, reaction.member.name, position, reaction.member.id
                 )
 
                 # Update message in this clash channel
@@ -239,7 +244,7 @@ class MundoBot(commands.Bot):
                     role = guild.get_role(clash.role_id)
                     await member.remove_roles(role)
                     new_positions = self.clash_manager.unregister_player(
-                        clash_id, member.name
+                        clash_id, member.name, position
                     )
 
                     # Update message in this clash channel
@@ -690,8 +695,9 @@ class MundoBot(commands.Bot):
             guild: dc.Guild = self.get_guild(clash.guild_id)
             clash_channel: dc.TextChannel = guild.get_channel(clash.clash_channel_id)
             players = self.clash_manager.players_for_clash(clash_entry["_id"])
+            regular_players = self.clash_manager.get_regular_players(guild.id)
             message: dc.Message = await clash_channel.send(
-                helpers.get_notification(players, clash)
+                helpers.get_notification(players, clash, regular_players)
             )
             clash.notification_message_ids.append(message.id)
             self.clash_manager.update_notification_ids(

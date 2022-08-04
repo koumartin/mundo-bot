@@ -54,22 +54,22 @@ def find_players(target: Position, players: Dict[str, Position]) -> str:
         str: Names of all players with that position or empty string.
     """
     output = ""
-    for player, position in players.items():
+    for player, position in players:
         if position == target:
             output += player + " "
     return output
 
 
-def show_players(players: Dict[str, str]) -> str:
+def show_players(players: List[Dict[str, str]]) -> str:
     """Creates a string containing the registered team of players in a clash.
 
     Args:
-        players (Dict[str, str]): Dictionary of players and theire role as string.
+        players (List[Dict[str, str]]): List of all registrations to the clash.
 
     Returns:
         str: Formatted string of players in a team.
     """
-    players_modified = dict(map(lambda x: (x[0], Position[x[1]]), players.items()))
+    players_modified = dict(map(lambda x: (x["name"], Position[x["role"]]), players))
 
     output = "Aktuální sestava\n"
     for position in Position:
@@ -135,7 +135,9 @@ def prepare_notification_times(clash: Clash) -> List[datetime]:
     return [clash_time + delta for delta in NOTIFICATION_DELTAS]
 
 
-def get_notification(players: Dict[str, str], clash: Clash) -> str:
+def get_notification(
+    players: Dict[str, str], clash: Clash, regular_players: List[int]
+) -> str:
     """Gets notification message for a clash.
 
     Args:
@@ -189,9 +191,10 @@ def get_notification(players: Dict[str, str], clash: Clash) -> str:
 
 
 def prepare_logging(
-    path: Optional[str] = None,
+    name: str,
     console_level: Optional[int] = None,
     file_level: Optional[int] = None,
+    path: Optional[str] = None,
 ) -> logging.Logger:
     """Prepares console and file logger with given level.
     If level is not provided than logger is not created.
@@ -204,9 +207,9 @@ def prepare_logging(
     Returns:
         logging.Logger: Final logger.
     """
-    logger = logging.getLogger("bot_logger")
+    logger = logging.getLogger(name)
     formatter = logging.Formatter(
-        "[%(levelname)s %(asctime)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
+        "[%(asctime)s %(name)s %(levelname)s] %(message)s", datefmt="%Y-%m-%d %H:%M:%S"
     )
     logger.setLevel(logging.DEBUG)
     if console_level is not None:

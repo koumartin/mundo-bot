@@ -1,6 +1,7 @@
 """Module providing classes of Clashmanager that manages stored Clashes."""
 from datetime import datetime
 from dataclasses import asdict
+import logging
 from typing import Any, Dict, List, Tuple
 
 from pymongo import MongoClient, collection, cursor
@@ -9,6 +10,7 @@ from dacite import from_dict
 from mundobot.clash import Clash
 from mundobot.position import Position
 from mundobot.clash_api_service import ApiClash
+from mundobot import helpers
 
 
 class ClashManager:
@@ -20,6 +22,8 @@ class ClashManager:
         self.positions: collection.Collection = client.clash.positions
         self.notifications: collection.Collection = client.clash.notifications
         self.registered_servers: collection.Collection = client.clash.registered_servers
+        self.regular_players: collection.Collection = client.clash.regular_players
+        self.logger = helpers.prepare_logging("mng", logging.WARNING)
 
     def clashes_for_guild(self, guild_id: int) -> cursor.Cursor:
         """Gets all clashes present for a given guild.
@@ -71,7 +75,7 @@ class ClashManager:
             clash (Clash): Clash to be added.
         """
         result = self.clashes.insert_one(asdict(clash))
-        self.positions.insert_one({"clash_id": result.inserted_id, "players": {}})
+        self.positions.insert_one({"clash_id": result.inserted_id, "players": []})
 
         if notification_times is None or not isinstance(notification_times, list):
             return
@@ -107,7 +111,7 @@ class ClashManager:
         return from_dict(Clash, result)
 
     def register_player(
-        self, clash_id: int, player_name: str, team_role: Position
+        self, clash_id: int, player_name: str, team_role: Position, player_id: int
     ) -> Dict[str, Any]:
         """Adds player to its position in a clash.
 
@@ -115,17 +119,41 @@ class ClashManager:
             clash_id (int): Id of the clash to which the player is added.
             player_name (str): Name of player to be added.
             team_role (Position): Position to which the player is added.
+            player_id (int): Id of the player
 
         Returns:
             Dict[str, Any]: Positions dictionary after modification.
         """
+        existing_positions: Dict[str, List] = self.positions.find_one(
+            {"clash_id": clash_id}
+        )
+        existing_players = existing_positions["players"]
+        already_existing = next(
+            (
+                x
+                for x in existing_players
+                if x["name"] == player_name and x["role"] == team_role
+            ),
+            None,
+        )
+
+        if already_existing is not None:
+            self.logger.warning("This combination already exists. Skipping.")
+            return existing_positions
+
+        existing_players.append(
+            {"name": player_name, "role": str(team_role), "id": player_id}
+        )
+
         return self.positions.find_one_and_update(
             {"clash_id": clash_id},
-            {"$set": {f"players.{player_name}": team_role.name}},
+            {"$set": {"players": existing_players}},
             return_document=collection.ReturnDocument.AFTER,
         )["players"]
 
-    def unregister_player(self, clash_id: int, player_name: str) -> Dict[str, Any]:
+    def unregister_player(
+        self, clash_id: int, player_name: str, team_role: Position
+    ) -> Dict[str, Any]:
         """Unregisters player from clash.
 
         Args:
@@ -135,9 +163,28 @@ class ClashManager:
         Returns:
             Dict[str, Any]: Positions dictionary after modification.
         """
+        existing_positions: Dict[str, List] = self.positions.find_one(
+            {"clash_id": clash_id}
+        )
+        existing_players = existing_positions["players"]
+        already_existing = next(
+            [
+                x
+                for x in existing_players
+                if x.name == player_name and x.role == str(team_role)
+            ],
+            None,
+        )
+
+        if already_existing is None:
+            self.logger.warning("This combination is not registered. Skipping.")
+            return existing_positions
+
+        existing_players.remove(already_existing)
+
         return self.positions.find_one_and_update(
             {"clash_id": clash_id},
-            {"$unset": {f"players.{player_name}": ""}},
+            {"$set": {"players": existing_players}},
             return_document=collection.ReturnDocument.AFTER,
         )["players"]
 
@@ -235,3 +282,22 @@ class ClashManager:
             {"_id": clash_id},
             {"$set": {"notification_message_ids": notification_message_ids}},
         )
+
+    def get_regular_players(self, guild_id: int) -> List[int]:
+        """Gets list to all players in guild that are regular clash players.
+
+        Args:
+            guild_id (int): Id of the guild.
+
+        Returns:
+            List[int]: List of regular player ids.
+        """
+        return [
+            player["id"] for player in self.regular_players.find({"guild_id": guild_id})
+        ]
+
+    def register_regular_player(self, guild_id: int, player) -> None:
+        pass
+
+    def unregister_regular_player(self, guild_id: int, player) -> None:
+        pass
