@@ -183,23 +183,12 @@ class MundoBot(commands.Bot):
                 position = Position.get_position(reaction.emoji.name)
                 role: dc.Role = guild.get_role(clash.role_id)
 
-                # If member is already in players for this clash,
-                # than remove his reaction, send him message and ignore
-                if reaction.member.name in self.clash_manager.players_for_clash(
-                    clash_id
-                ):
-                    channel = guild.get_channel(reaction.channel_id)
-                    message = await channel.fetch_message(reaction.message_id)
-                    await message.remove_reaction(reaction.emoji, reaction.member)
-                    await reaction.member.send("Only one position per player dummy.")
-                    return
-
                 # NOOB doesn't get player role and access to channel
                 if position != Position.NOOB:
                     await reaction.member.add_roles(role)
 
                 new_positions = self.clash_manager.register_player(
-                    clash_id, reaction.member.name, position, reaction.member.id
+                    clash_id, reaction.member.id, reaction.member.name, position
                 )
 
                 # Update message in this clash channel
@@ -542,7 +531,7 @@ class MundoBot(commands.Bot):
             )
 
         # Add message to channel and pin it
-        status: dc.Message = await channel.send(helpers.show_players({}))
+        status: dc.Message = await channel.send(helpers.show_players())
         await status.pin()
 
         # Create new Clash object to hold all data about it and supporting structure

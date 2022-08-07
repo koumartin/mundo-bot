@@ -4,7 +4,7 @@ import logging
 import os
 from typing import Dict, List, Optional
 import discord as dc
-from mundobot.position import Position
+from mundobot.position import Position, ClashPositions, PositionRecord
 from mundobot.clash import Clash
 
 
@@ -43,37 +43,37 @@ async def conditional_delete(message: dc.Message) -> None:
         await message.delete()
 
 
-def find_players(target: Position, players: Dict[str, Position]) -> str:
+def find_players(target: Position, players: List[PositionRecord]) -> str:
     """Gets names of all players with given position in registered players for clash.
 
     Args:
         target (Position): Position of the players.
-        players (Dict[str, Position]): Dictionary of registered players.
+        players (List[PositionRecord]): Records of the registerations.
 
     Returns:
         str: Names of all players with that position or empty string.
     """
     output = ""
-    for player, position in players:
-        if position == target:
-            output += player + " "
+    for registration in players:
+        if registration.position == target:
+            output += registration.player_name + " "
     return output
 
 
-def show_players(players: List[Dict[str, str]]) -> str:
+def show_players(positions: ClashPositions = None) -> str:
     """Creates a string containing the registered team of players in a clash.
 
     Args:
-        players (List[Dict[str, str]]): List of all registrations to the clash.
+        positions (ClashPositions, optional): All registrations to the clash. Defaults to None.
 
     Returns:
         str: Formatted string of players in a team.
     """
-    players_modified = dict(map(lambda x: (x["name"], Position[x["role"]]), players))
+    players = positions.players if positions is not None else []
 
     output = "Aktuální sestava\n"
     for position in Position:
-        output += f"{str(position)} : {find_players(position, players_modified)}\n"
+        output += f"{str(position)} : {find_players(position, players)}\n"
     return output
 
 

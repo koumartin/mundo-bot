@@ -8,7 +8,12 @@ from pymongo import MongoClient, collection, cursor
 from dacite import from_dict
 
 from mundobot.clash import Clash
-from mundobot.position import Position
+from mundobot.position import (
+    Position,
+    PositionRecord,
+    ClashPositions,
+    DACITE_POSITION_CONFIG,
+)
 from mundobot.clash_api_service import ApiClash
 from mundobot import helpers
 
@@ -111,28 +116,30 @@ class ClashManager:
         return from_dict(Clash, result)
 
     def register_player(
-        self, clash_id: int, player_name: str, team_role: Position, player_id: int
-    ) -> Dict[str, Any]:
+        self, clash_id: int, player_id: int, player_name: str, team_role: Position
+    ) -> ClashPositions:
         """Adds player to its position in a clash.
 
         Args:
             clash_id (int): Id of the clash to which the player is added.
+            player_id (int): Id of the player.
             player_name (str): Name of player to be added.
             team_role (Position): Position to which the player is added.
-            player_id (int): Id of the player
 
         Returns:
-            Dict[str, Any]: Positions dictionary after modification.
+            ClashPositions: Positions after modification.
         """
-        existing_positions: Dict[str, List] = self.positions.find_one(
-            {"clash_id": clash_id}
+        existing_positions = from_dict(
+            ClashPositions,
+            self.positions.find_one({"clash_id": clash_id}),
+            DACITE_POSITION_CONFIG,
         )
-        existing_players = existing_positions["players"]
+        existing_players = existing_positions.players
         already_existing = next(
             (
                 x
                 for x in existing_players
-                if x["name"] == player_name and x["role"] == team_role
+                if x.player_name == player_name and x.position == team_role
             ),
             None,
         )
@@ -141,15 +148,18 @@ class ClashManager:
             self.logger.warning("This combination already exists. Skipping.")
             return existing_positions
 
-        existing_players.append(
-            {"name": player_name, "role": str(team_role), "id": player_id}
-        )
+        existing_players.append(PositionRecord(player_id, player_name, team_role))
+        new_players = list(map(lambda x: x.as_dict(), existing_players))
 
-        return self.positions.find_one_and_update(
-            {"clash_id": clash_id},
-            {"$set": {"players": existing_players}},
-            return_document=collection.ReturnDocument.AFTER,
-        )["players"]
+        return from_dict(
+            ClashPositions,
+            self.positions.find_one_and_update(
+                {"clash_id": clash_id},
+                {"$set": {"players": new_players}},
+                return_document=collection.ReturnDocument.AFTER,
+            ),
+            DACITE_POSITION_CONFIG,
+        )
 
     def unregister_player(
         self, clash_id: int, player_name: str, team_role: Position
@@ -159,19 +169,22 @@ class ClashManager:
         Args:
             clash_id (int): Id of the clash from which the player is removed.
             player_name (str): Name of the player.
+            team_role (Position): Position of the player in the clash.
 
         Returns:
-            Dict[str, Any]: Positions dictionary after modification.
+            ClashPositions: Positions after modification.
         """
-        existing_positions: Dict[str, List] = self.positions.find_one(
-            {"clash_id": clash_id}
+        existing_positions = from_dict(
+            ClashPositions,
+            self.positions.find_one({"clash_id": clash_id}),
+            DACITE_POSITION_CONFIG,
         )
-        existing_players = existing_positions["players"]
+        existing_players = existing_positions.players
         already_existing = next(
             [
                 x
                 for x in existing_players
-                if x.name == player_name and x.role == str(team_role)
+                if x.player_name == player_name and x.position == str(team_role)
             ],
             None,
         )
@@ -181,12 +194,17 @@ class ClashManager:
             return existing_positions
 
         existing_players.remove(already_existing)
+        new_players = list(map(lambda x: x.as_dict(), existing_players))
 
-        return self.positions.find_one_and_update(
-            {"clash_id": clash_id},
-            {"$set": {"players": existing_players}},
-            return_document=collection.ReturnDocument.AFTER,
-        )["players"]
+        return from_dict(
+            ClashPositions,
+            self.positions.find_one_and_update(
+                {"clash_id": clash_id},
+                {"$set": {"players": new_players}},
+                return_document=collection.ReturnDocument.AFTER,
+            ),
+            DACITE_POSITION_CONFIG,
+        )
 
     def get_needed_changes(
         self, guild_id: int, confirmed_clashes: List[ApiClash]
