@@ -183,6 +183,14 @@ class MundoBot(commands.Bot):
                 position = Position.get_position(reaction.emoji.name)
                 role: dc.Role = guild.get_role(clash.role_id)
 
+                self.logger.info(
+                    "%s is registering for %s position in %s of %s server.",
+                    reaction.member.name,
+                    position,
+                    clash.name,
+                    guild.name,
+                )
+
                 # NOOB doesn't get player role and access to channel
                 if position != Position.NOOB:
                     await reaction.member.add_roles(role)
@@ -226,24 +234,26 @@ class MundoBot(commands.Bot):
                 member: dc.Member = guild.get_member(reaction.user_id)
                 role: dc.Role = guild.get_role(clash.role_id)
 
-                # If player had this position remove them from player and role
-                if position == self.clash_manager.role_for_player(
-                    clash_id, member.name
-                ):
-                    role = guild.get_role(clash.role_id)
-                    await member.remove_roles(role)
-                    new_positions = self.clash_manager.unregister_player(
-                        clash_id, member.name, position
-                    )
+                self.logger.info(
+                    "%s is unregistering from %s position in %s of %s server.",
+                    member.name,
+                    position,
+                    clash.name,
+                    guild.name,
+                )
 
-                    # Update message in this clash channel
-                    channel = guild.get_channel(clash.channel_id)
-                    status_message: dc.Message = await channel.fetch_message(
-                        clash.status_id
-                    )
-                    await status_message.edit(
-                        content=helpers.show_players(new_positions)
-                    )
+                role = guild.get_role(clash.role_id)
+                await member.remove_roles(role)
+                new_positions = self.clash_manager.unregister_player(
+                    clash_id, member.name, position
+                )
+
+                # Update message in this clash channel
+                channel = guild.get_channel(clash.channel_id)
+                status_message: dc.Message = await channel.fetch_message(
+                    clash.status_id
+                )
+                await status_message.edit(content=helpers.show_players(new_positions))
                 break
 
         # -----------------------------------------------------

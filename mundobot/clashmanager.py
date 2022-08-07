@@ -181,11 +181,11 @@ class ClashManager:
         )
         existing_players = existing_positions.players
         already_existing = next(
-            [
+            (
                 x
                 for x in existing_players
-                if x.player_name == player_name and x.position == str(team_role)
-            ],
+                if x.player_name == player_name and x.position == team_role
+            ),
             None,
         )
 
