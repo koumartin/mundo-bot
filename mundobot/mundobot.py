@@ -9,7 +9,7 @@ import signal
 from datetime import datetime, timedelta
 import sys
 import traceback
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 from uuid import UUID, getnode
 import certifi
 
@@ -450,14 +450,61 @@ class MundoBot(commands.Bot):
 
         @self.command()
         @self.single_handle()
-        async def test(ctx: Context) -> None:
+        async def regular_players(ctx: Context) -> None:
+            await helpers.conditional_delete(ctx.message)
+
+            guild: dc.Guild = ctx.guild
+            self.logger.info(
+                "Getting list of regular players in %s",
+                guild.name,
+            )
+            regular_player_ids = self.clash_manager.regular_players_for_guild(guild.id)
+            regular_players: Iterable[dc.Member | None] = map(
+                lambda x: guild.get_member(x).name, regular_player_ids
+            )
+
+            message = "Častí hráči pro tento server jsou\n" + " ".join(regular_players)
+            await ctx.channel.send(message)
+
+        @self.command()
+        @self.single_handle()
+        async def register_as_regular(ctx: Context) -> None:
+            await helpers.conditional_delete(ctx.message)
+
+            player: dc.Member = ctx.author
+            guild: dc.Guild = ctx.guild
+            self.logger.info(
+                "%s is registering as regular player in %s",
+                player.name,
+                guild.name,
+            )
+            self.clash_manager.register_regular_player(guild.id, player.id)
+            await ctx.author.send("Nyní jsi častým hráčem na serveru " + guild.name)
+
+        @self.command()
+        @self.single_handle()
+        async def unregister_as_regular(ctx: Context) -> None:
+            await helpers.conditional_delete(ctx.message)
+
+            player: dc.Member = ctx.author
+            guild: dc.Guild = ctx.guild
+            self.logger.info(
+                "%s is unregistering from being regular player in %s",
+                player.name,
+                guild.name,
+            )
+            self.clash_manager.unregister_regular_player(guild.id, player.id)
+            await ctx.author.send("Nadále nejsi častým hráčem na serveru " + guild.name)
+
+        @self.command()
+        @self.single_handle()
+        async def test(_: Context) -> None:
             """Testing function
 
             Args:
                 ctx (Context): Context of the command.
             """
-            print([c.name for c in self.commands])
-            print(ctx.guild.id)
+            await self.run_notifications()
 
     # -----------------------------------------------------
     # HELPER FUNCTION FOR CLASH INSTANCES
@@ -476,7 +523,8 @@ class MundoBot(commands.Bot):
             guild (dc.Guild): Guild for which the clash is created.
             clash_name (str): Name of the clash.
             date (str): Date of the clash
-            user (Optional[dc.Member]): User which will receive error and whose permissions will be the baseline.
+            user (Optional[dc.Member]): User which will receive error and
+            whose permissions will be the baseline.
             riot_id (Optional[int]): Id of clash in riot database.
         """
         # Convert date from iso format if necessary
@@ -693,8 +741,8 @@ class MundoBot(commands.Bot):
             clash = from_dict(Clash, clash_entry)
             guild: dc.Guild = self.get_guild(clash.guild_id)
             clash_channel: dc.TextChannel = guild.get_channel(clash.clash_channel_id)
-            players = self.clash_manager.players_for_clash(clash_entry["_id"])
-            regular_players = self.clash_manager.get_regular_players(guild.id)
+            players = self.clash_manager.positions_for_clash(clash_entry["_id"]).players
+            regular_players = self.clash_manager.regular_players_for_guild(guild.id)
             message: dc.Message = await clash_channel.send(
                 helpers.get_notification(players, clash, regular_players)
             )

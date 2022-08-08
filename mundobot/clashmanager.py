@@ -41,35 +41,20 @@ class ClashManager:
         """
         return self.clashes.find({"guild_id": guild_id})
 
-    def players_for_clash(self, clash_id: int) -> Dict[str, str]:
-        """Gets list of players for a clash with given db id.
+    def positions_for_clash(self, clash_id: int) -> ClashPositions:
+        """Gets positions for a clash.
 
         Args:
-            clash_id (int): Id of the clash in db.
+            clash_id (int): Id of the clash in DB.
 
         Returns:
-            Dict[str, str]: Mapping of players to their role.
+            ClashPositions: Positions in the clash.
         """
-        return self.positions.find_one(
-            {"clash_id": clash_id},
-            projection={"players": True, "_id": False},
-        )["players"]
-
-    def role_for_player(self, clash_id: int, player_name: str) -> Position | None:
-        """Gets the position of the player in given clash.
-
-        Args:
-            clash_id (int): Id of the clash.
-            player_name (str): Name of the player.
-
-        Returns:
-            Position | None: Position of the player or None if the player does not have position.
-        """
-        players_for_clash = self.players_for_clash(clash_id)
-        try:
-            return Position[players_for_clash[player_name]]
-        except KeyError:
-            return None
+        return from_dict(
+            ClashPositions,
+            self.positions.find_one({"clash_id": clash_id}),
+            DACITE_POSITION_CONFIG,
+        )
 
     def add_clash(
         self, clash: Clash, notification_times: List[datetime] = None
@@ -129,11 +114,7 @@ class ClashManager:
         Returns:
             ClashPositions: Positions after modification.
         """
-        existing_positions = from_dict(
-            ClashPositions,
-            self.positions.find_one({"clash_id": clash_id}),
-            DACITE_POSITION_CONFIG,
-        )
+        existing_positions = self.positions_for_clash(clash_id)
         existing_players = existing_positions.players
         already_existing = next(
             (
@@ -174,11 +155,7 @@ class ClashManager:
         Returns:
             ClashPositions: Positions after modification.
         """
-        existing_positions = from_dict(
-            ClashPositions,
-            self.positions.find_one({"clash_id": clash_id}),
-            DACITE_POSITION_CONFIG,
-        )
+        existing_positions = self.positions_for_clash(clash_id)
         existing_players = existing_positions.players
         already_existing = next(
             (
@@ -301,21 +278,37 @@ class ClashManager:
             {"$set": {"notification_message_ids": notification_message_ids}},
         )
 
-    def get_regular_players(self, guild_id: int) -> List[int]:
-        """Gets list to all players in guild that are regular clash players.
+    def regular_players_for_guild(self, guild_id: int) -> List[int]:
+        """Gets list of ids of regular players in a guild.
 
         Args:
             guild_id (int): Id of the guild.
 
         Returns:
-            List[int]: List of regular player ids.
+            List[int]: Ids of the regular players.
         """
         return [
-            player["id"] for player in self.regular_players.find({"guild_id": guild_id})
+            x["player_id"] for x in self.regular_players.find({"guild_id": guild_id})
         ]
 
-    def register_regular_player(self, guild_id: int, player) -> None:
-        pass
+    def register_regular_player(self, guild_id: int, player_id: int) -> None:
+        """Registers a player as a regular player of a guild.
 
-    def unregister_regular_player(self, guild_id: int, player) -> None:
-        pass
+        Args:
+            guild_id (int): Id of the guild.
+            player_id (int): Id of the player.
+        """
+        self.regular_players.update_one(
+            {"player_id": player_id, "guild_id": guild_id},
+            {"$set": {"player_id": player_id, "guild_id": guild_id}},
+            upsert=True,
+        )
+
+    def unregister_regular_player(self, guild_id: int, player_id: int) -> None:
+        """Unregisters a player as a regular player of a guild.
+
+        Args:
+            guild_id (int): Id of the guild.
+            player_id (int): Id of the player.
+        """
+        self.regular_players.delete_one({"player_id": player_id, "guild_id": guild_id})

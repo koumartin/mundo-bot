@@ -2,7 +2,7 @@
 from datetime import datetime, timedelta
 import logging
 import os
-from typing import Dict, List, Optional
+from typing import List, Optional
 import discord as dc
 from mundobot.position import Position, ClashPositions, PositionRecord
 from mundobot.clash import Clash
@@ -136,7 +136,7 @@ def prepare_notification_times(clash: Clash) -> List[datetime]:
 
 
 def get_notification(
-    players: Dict[str, str], clash: Clash, regular_players: List[int]
+    players: List[PositionRecord], clash: Clash, regular_players: List[int]
 ) -> str:
     """Gets notification message for a clash.
 
@@ -159,33 +159,47 @@ def get_notification(
     missing_positions = list(Position)
     missing_positions.remove(Position.FILL)
     missing_positions.remove(Position.NOOB)
-    for position_str in players.values():
-        position = Position[position_str]
-        if position in missing_positions:
-            missing_positions.remove(position)
+    for registration in players:
+        if registration.position in missing_positions:
+            missing_positions.remove(registration.position)
 
     output = (
         f"Clash {clash.name} začíná za zhruba {remaining_time.days} dní, "
-        + f"{remaining_hours}hodin a {remaining_minutes} minut.\n"
+        + f"{remaining_hours} hodin a {remaining_minutes} minut.\n"
     )
-    unique_players = set(
-        player
-        for player, position in players.items()
-        if Position[position] != Position.NOOB
-    )
-    connection = ("je", "") if len(unique_players) == 1 else ("jsou", "i")
+    unique_player_ids = {
+        registration.player_id
+        for registration in players
+        if registration.position != Position.NOOB
+    }
 
-    if len(unique_players) < 5:
+    unique_players_count = len(unique_player_ids)
+    if unique_players_count < 5:
+        connection = ("je", "") if unique_players_count == 1 else ("jsou", "i")
         output += (
             f"Stále není dost hráčů. Aktuálně {connection[0]} "
-            + f"přihlášen{connection[1]} pouze {len(unique_players)} hráč{connection[1]}.\n"
+            + f"přihlášen{connection[1]} pouze {unique_players_count} hráč{connection[1]}.\n"
         )
     if len(missing_positions) > 0:
         output += "Stále chybí hráči na pozice: \n"
         for position in missing_positions:
             output += str(position) + " "
+        output += "\n"
+
+    if unique_players_count < 5 or len(missing_positions) > 0:
+        unresponive_players_ids = {
+            id for id in regular_players if id not in unique_player_ids
+        }
+        if len(unresponive_players_ids) > 0:
+            output += "Stále neodpověděli: \n"
+            for player_id in unresponive_players_ids:
+                output += f"<@{player_id}> "
+        else:
+            output += "Všichni již odpověděli, takže zkuste hledat jinde."
     else:
-        output += "Všechny pozice jsou zaplněny, takže pouze připomínám."
+        output += (
+            "Všechny pozice jsou zaplněny a hráčů je dostatek, takže pouze připomínám."
+        )
 
     return output
 
