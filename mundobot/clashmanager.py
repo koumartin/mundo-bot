@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Tuple
 from pymongo import MongoClient, collection, cursor
 from dacite import from_dict
 
-from mundobot.clash import Clash
+from mundobot.clash import Clash, RegularPlayer
 from mundobot.position import (
     Position,
     PositionRecord,
@@ -288,27 +288,94 @@ class ClashManager:
             List[int]: Ids of the regular players.
         """
         return [
-            x["player_id"] for x in self.regular_players.find({"guild_id": guild_id})
+            x["player_id"]
+            for x in self.regular_players.find({"guild_id": guild_id, "active": True})
         ]
 
-    def register_regular_player(self, guild_id: int, player_id: int) -> None:
+    def register_regular_player(
+        self,
+        guild_id: int,
+        player_id: int,
+        self_managing: bool = False,
+        privilaged_managing: bool = False,
+    ) -> None:
         """Registers a player as a regular player of a guild.
 
         Args:
             guild_id (int): Id of the guild.
             player_id (int): Id of the player.
         """
-        self.regular_players.update_one(
-            {"player_id": player_id, "guild_id": guild_id},
-            {"$set": {"player_id": player_id, "guild_id": guild_id}},
-            upsert=True,
+        current = self.regular_players.find_one(
+            {"player_id": player_id, "guild_id": guild_id}
         )
 
-    def unregister_regular_player(self, guild_id: int, player_id: int) -> None:
+        if current is None:
+            new_regular = RegularPlayer(player_id, guild_id, True)
+            self.regular_players.insert_one(asdict(new_regular))
+            return True
+
+        current_regular = from_dict(RegularPlayer, current)
+        if current_regular.active is True:
+            raise ValueError("The player is already active.")
+        if current_regular.overruled == "member" and not self_managing:
+            raise ValueError(
+                "The player decided to not be regular and needs to start again himself."
+            )
+        if current_regular.overruled == "server" and not privilaged_managing:
+            raise ValueError(
+                "The server decided to remove player from regular and needs to register him again."
+            )
+
+        last_activated = "none"
+        if self_managing is True:
+            last_activated = "member"
+        if privilaged_managing is True:
+            last_activated = "server"
+        self.regular_players.find_one_and_update(
+            {"player_id": player_id, "guild_id": guild_id},
+            {"$set": {"active": True, "last_activated": last_activated}},
+        )
+        return True
+
+    def unregister_regular_player(
+        self,
+        guild_id: int,
+        player_id: int,
+        self_managing: bool = False,
+        privilaged_managing: bool = False,
+    ) -> None:
         """Unregisters a player as a regular player of a guild.
 
         Args:
             guild_id (int): Id of the guild.
             player_id (int): Id of the player.
+
+        Exceptions:
+
         """
-        self.regular_players.delete_one({"player_id": player_id, "guild_id": guild_id})
+        current = self.regular_players.find_one(
+            {"player_id": player_id, "guild_id": guild_id}
+        )
+
+        if current is None:
+            raise ValueError("The player is not regular in given server.")
+
+        current_player = from_dict(RegularPlayer, current)
+        if current_player.active is not True:
+            raise ValueError("The player is not currently active.")
+        overrule = "none"
+        if self_managing is True:
+            overrule = "member"
+        if privilaged_managing is True:
+            overrule = "server"
+        if (
+            current_player.last_activated != overrule
+            and current_player.last_activated != "none"
+        ):
+            final_overrule = overrule
+
+        self.regular_players.update_one(
+            {"player_id": player_id, "guild_id": guild_id},
+            {"$set": {"active": False, "overruled": final_overrule or "none"}},
+        )
+        return True

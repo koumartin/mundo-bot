@@ -468,33 +468,67 @@ class MundoBot(commands.Bot):
 
         @self.command()
         @self.single_handle()
-        async def register_as_regular(ctx: Context) -> None:
+        async def register_as_regular(ctx: Context, name: Optional[str] = None) -> None:
             await helpers.conditional_delete(ctx.message)
 
-            player: dc.Member = ctx.author
             guild: dc.Guild = ctx.guild
+            player: dc.Member
+            if name is None:
+                player = ctx.author
+            else:
+                if not await helpers.check_permissions(ctx.author):
+                    return
+                player = guild.get_member_named(name)
+
             self.logger.info(
                 "%s is registering as regular player in %s",
                 player.name,
                 guild.name,
             )
-            self.clash_manager.register_regular_player(guild.id, player.id)
-            await ctx.author.send("Nyní jsi častým hráčem na serveru " + guild.name)
+
+            if player is None:
+                ctx.author.send("Hráč neexistuje.")
+
+            try:
+                self.clash_manager.register_regular_player(
+                    guild.id, player.id, not bool(name), bool(name)
+                )
+                await ctx.author.send("Nyní jsi častým hráčem na serveru " + guild.name)
+            except ValueError as error:
+                await ctx.author.send(error.args[0])
 
         @self.command()
         @self.single_handle()
-        async def unregister_as_regular(ctx: Context) -> None:
+        async def unregister_as_regular(ctx: Context, name: Optional[str]) -> None:
             await helpers.conditional_delete(ctx.message)
 
-            player: dc.Member = ctx.author
             guild: dc.Guild = ctx.guild
+            player: dc.Member
+            if name is None:
+                player = ctx.author
+            else:
+                if not await helpers.check_permissions(ctx.author):
+                    return
+                player = guild.get_member_named(name)
+
+            if player is None:
+                ctx.author.send("Hráč neexistuje.")
+
             self.logger.info(
                 "%s is unregistering from being regular player in %s",
                 player.name,
                 guild.name,
             )
-            self.clash_manager.unregister_regular_player(guild.id, player.id)
-            await ctx.author.send("Nadále nejsi častým hráčem na serveru " + guild.name)
+
+            try:
+                self.clash_manager.unregister_regular_player(
+                    guild.id, player.id, not bool(name), bool(name)
+                )
+                await ctx.author.send(
+                    "Nadále nejsi častým hráčem na serveru " + guild.name
+                )
+            except ValueError as error:
+                await ctx.author.send(error.args[0])
 
         @self.command()
         @self.single_handle()
