@@ -148,8 +148,7 @@ class MundoBot(commands.Bot):
             # Check if the state update was joining a room
             if before.channel != after.channel and after.channel is not None:
                 self.logger.info(
-                    "%s from channel %s to \
-                       %s in %s",
+                    "%s from channel %s to %s in %s",
                     member,
                     before.channel,
                     after.channel,
@@ -488,14 +487,23 @@ class MundoBot(commands.Bot):
 
             if player is None:
                 ctx.author.send("Hráč neexistuje.")
+                return
 
             try:
                 self.clash_manager.register_regular_player(
                     guild.id, player.id, not bool(name), bool(name)
                 )
-                await ctx.author.send("Nyní jsi častým hráčem na serveru " + guild.name)
             except ValueError as error:
                 await ctx.author.send(error.args[0])
+                return
+
+            if name is None:
+                await ctx.author.send("Nyní jsi častým hráčem na serveru " + guild.name)
+            else:
+                await ctx.author.send(
+                    name + " je nyní častým hráčem na serveru " + guild.name
+                )
+                await player.send("Nyní jsi častým hráčem na serveru " + guild.name)
 
         @self.command()
         @self.single_handle()
@@ -513,6 +521,7 @@ class MundoBot(commands.Bot):
 
             if player is None:
                 ctx.author.send("Hráč neexistuje.")
+                return
 
             self.logger.info(
                 "%s is unregistering from being regular player in %s",
@@ -524,11 +533,19 @@ class MundoBot(commands.Bot):
                 self.clash_manager.unregister_regular_player(
                     guild.id, player.id, not bool(name), bool(name)
                 )
+            except ValueError as error:
+                await ctx.author.send(error.args[0])
+                return
+
+            if name is None:
                 await ctx.author.send(
                     "Nadále nejsi častým hráčem na serveru " + guild.name
                 )
-            except ValueError as error:
-                await ctx.author.send(error.args[0])
+            else:
+                await ctx.author.send(
+                    name + " nadále není častým hráčem na serveru " + guild.name
+                )
+                await player.send("Nadále nejsi častým hráčem na serveru " + guild.name)
 
         @self.command()
         @self.single_handle()

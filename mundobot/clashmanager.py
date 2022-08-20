@@ -320,10 +320,12 @@ class ClashManager:
         if current_regular.overruled == "member" and not self_managing:
             raise ValueError(
                 "The player decided to not be regular and needs to start again himself."
+                + " Ask player directly."
             )
         if current_regular.overruled == "server" and not privilaged_managing:
             raise ValueError(
-                "The server decided to remove player from regular and needs to register him again."
+                "The server decided to remove player from regulars."
+                + " Server admin needs to register him again. Ask admin directly."
             )
 
         last_activated = "none"
@@ -368,11 +370,10 @@ class ClashManager:
             overrule = "member"
         if privilaged_managing is True:
             overrule = "server"
-        if (
-            current_player.last_activated != overrule
-            and current_player.last_activated != "none"
-        ):
+        if current_player.last_activated not in (overrule, "none"):
             final_overrule = overrule
+        else:
+            final_overrule = "none"
 
         self.regular_players.update_one(
             {"player_id": player_id, "guild_id": guild_id},
