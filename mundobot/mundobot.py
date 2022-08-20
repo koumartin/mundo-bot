@@ -9,7 +9,7 @@ import signal
 from datetime import datetime, timedelta
 import sys
 import traceback
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, Iterable, List, Optional, Tuple
 from uuid import UUID, getnode
 import certifi
 
@@ -83,7 +83,12 @@ class MundoBot(commands.Bot):
         self.job: Optional[schedule.Job] = None
         self.singleton_collection = self.client.bot.singleton
 
-        self.logger = helpers.prepare_logging(self.path, logging.DEBUG, logging.WARNING)
+        self.logger = helpers.prepare_logging(
+            "bot",
+            logging.DEBUG,
+            logging.WARNING,
+            self.path,
+        )
         self.add_all_commands()
 
     def start_running(self) -> None:
@@ -143,8 +148,7 @@ class MundoBot(commands.Bot):
             # Check if the state update was joining a room
             if before.channel != after.channel and after.channel is not None:
                 self.logger.info(
-                    "%s from channel %s to \
-                       %s in %s",
+                    "%s from channel %s to %s in %s",
                     member,
                     before.channel,
                     after.channel,
@@ -178,23 +182,20 @@ class MundoBot(commands.Bot):
                 position = Position.get_position(reaction.emoji.name)
                 role: dc.Role = guild.get_role(clash.role_id)
 
-                # If member is already in players for this clash,
-                # than remove his reaction, send him message and ignore
-                if reaction.member.name in self.clash_manager.players_for_clash(
-                    clash_id
-                ):
-                    channel = guild.get_channel(reaction.channel_id)
-                    message = await channel.fetch_message(reaction.message_id)
-                    await message.remove_reaction(reaction.emoji, reaction.member)
-                    await reaction.member.send("Only one position per player dummy.")
-                    return
+                self.logger.info(
+                    "%s is registering for %s position in %s of %s server.",
+                    reaction.member.name,
+                    position,
+                    clash.name,
+                    guild.name,
+                )
 
                 # NOOB doesn't get player role and access to channel
                 if position != Position.NOOB:
                     await reaction.member.add_roles(role)
 
                 new_positions = self.clash_manager.register_player(
-                    clash_id, reaction.member.name, position
+                    clash_id, reaction.member.id, reaction.member.name, position
                 )
 
                 # Update message in this clash channel
@@ -232,24 +233,26 @@ class MundoBot(commands.Bot):
                 member: dc.Member = guild.get_member(reaction.user_id)
                 role: dc.Role = guild.get_role(clash.role_id)
 
-                # If player had this position remove them from player and role
-                if position == self.clash_manager.role_for_player(
-                    clash_id, member.name
-                ):
-                    role = guild.get_role(clash.role_id)
-                    await member.remove_roles(role)
-                    new_positions = self.clash_manager.unregister_player(
-                        clash_id, member.name
-                    )
+                self.logger.info(
+                    "%s is unregistering from %s position in %s of %s server.",
+                    member.name,
+                    position,
+                    clash.name,
+                    guild.name,
+                )
 
-                    # Update message in this clash channel
-                    channel = guild.get_channel(clash.channel_id)
-                    status_message: dc.Message = await channel.fetch_message(
-                        clash.status_id
-                    )
-                    await status_message.edit(
-                        content=helpers.show_players(new_positions)
-                    )
+                role = guild.get_role(clash.role_id)
+                await member.remove_roles(role)
+                new_positions = self.clash_manager.unregister_player(
+                    clash_id, member.name, position
+                )
+
+                # Update message in this clash channel
+                channel = guild.get_channel(clash.channel_id)
+                status_message: dc.Message = await channel.fetch_message(
+                    clash.status_id
+                )
+                await status_message.edit(content=helpers.show_players(new_positions))
                 break
 
         # -----------------------------------------------------
@@ -446,14 +449,113 @@ class MundoBot(commands.Bot):
 
         @self.command()
         @self.single_handle()
-        async def test(ctx: Context) -> None:
+        async def regular_players(ctx: Context) -> None:
+            await helpers.conditional_delete(ctx.message)
+
+            guild: dc.Guild = ctx.guild
+            self.logger.info(
+                "Getting list of regular players in %s",
+                guild.name,
+            )
+            regular_player_ids = self.clash_manager.regular_players_for_guild(guild.id)
+            regular_players: Iterable[dc.Member | None] = map(
+                lambda x: guild.get_member(x).name, regular_player_ids
+            )
+
+            message = "Častí hráči pro tento server jsou\n" + " ".join(regular_players)
+            await ctx.channel.send(message)
+
+        @self.command()
+        @self.single_handle()
+        async def register_as_regular(ctx: Context, name: Optional[str] = None) -> None:
+            await helpers.conditional_delete(ctx.message)
+
+            guild: dc.Guild = ctx.guild
+            player: dc.Member
+            if name is None:
+                player = ctx.author
+            else:
+                if not await helpers.check_permissions(ctx.author):
+                    return
+                player = guild.get_member_named(name)
+
+            self.logger.info(
+                "%s is registering as regular player in %s",
+                player.name,
+                guild.name,
+            )
+
+            if player is None:
+                ctx.author.send("Hráč neexistuje.")
+                return
+
+            try:
+                self.clash_manager.register_regular_player(
+                    guild.id, player.id, not bool(name), bool(name)
+                )
+            except ValueError as error:
+                await ctx.author.send(error.args[0])
+                return
+
+            if name is None:
+                await ctx.author.send("Nyní jsi častým hráčem na serveru " + guild.name)
+            else:
+                await ctx.author.send(
+                    name + " je nyní častým hráčem na serveru " + guild.name
+                )
+                await player.send("Nyní jsi častým hráčem na serveru " + guild.name)
+
+        @self.command()
+        @self.single_handle()
+        async def unregister_as_regular(ctx: Context, name: Optional[str]) -> None:
+            await helpers.conditional_delete(ctx.message)
+
+            guild: dc.Guild = ctx.guild
+            player: dc.Member
+            if name is None:
+                player = ctx.author
+            else:
+                if not await helpers.check_permissions(ctx.author):
+                    return
+                player = guild.get_member_named(name)
+
+            if player is None:
+                ctx.author.send("Hráč neexistuje.")
+                return
+
+            self.logger.info(
+                "%s is unregistering from being regular player in %s",
+                player.name,
+                guild.name,
+            )
+
+            try:
+                self.clash_manager.unregister_regular_player(
+                    guild.id, player.id, not bool(name), bool(name)
+                )
+            except ValueError as error:
+                await ctx.author.send(error.args[0])
+                return
+
+            if name is None:
+                await ctx.author.send(
+                    "Nadále nejsi častým hráčem na serveru " + guild.name
+                )
+            else:
+                await ctx.author.send(
+                    name + " nadále není častým hráčem na serveru " + guild.name
+                )
+                await player.send("Nadále nejsi častým hráčem na serveru " + guild.name)
+
+        @self.command()
+        @self.single_handle()
+        async def test(_: Context) -> None:
             """Testing function
 
             Args:
                 ctx (Context): Context of the command.
             """
-            print([c.name for c in self.commands])
-            print(ctx.guild.id)
+            await self.run_notifications()
 
     # -----------------------------------------------------
     # HELPER FUNCTION FOR CLASH INSTANCES
@@ -472,7 +574,8 @@ class MundoBot(commands.Bot):
             guild (dc.Guild): Guild for which the clash is created.
             clash_name (str): Name of the clash.
             date (str): Date of the clash
-            user (Optional[dc.Member]): User which will receive error and whose permissions will be the baseline.
+            user (Optional[dc.Member]): User which will receive error and
+            whose permissions will be the baseline.
             riot_id (Optional[int]): Id of clash in riot database.
         """
         # Convert date from iso format if necessary
@@ -537,7 +640,7 @@ class MundoBot(commands.Bot):
             )
 
         # Add message to channel and pin it
-        status: dc.Message = await channel.send(helpers.show_players({}))
+        status: dc.Message = await channel.send(helpers.show_players())
         await status.pin()
 
         # Create new Clash object to hold all data about it and supporting structure
@@ -689,9 +792,10 @@ class MundoBot(commands.Bot):
             clash = from_dict(Clash, clash_entry)
             guild: dc.Guild = self.get_guild(clash.guild_id)
             clash_channel: dc.TextChannel = guild.get_channel(clash.clash_channel_id)
-            players = self.clash_manager.players_for_clash(clash_entry["_id"])
+            players = self.clash_manager.positions_for_clash(clash_entry["_id"]).players
+            regular_players = self.clash_manager.regular_players_for_guild(guild.id)
             message: dc.Message = await clash_channel.send(
-                helpers.get_notification(players, clash)
+                helpers.get_notification(players, clash, regular_players)
             )
             clash.notification_message_ids.append(message.id)
             self.clash_manager.update_notification_ids(

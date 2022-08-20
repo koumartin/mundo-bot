@@ -28,3 +28,20 @@ class Clash:
                 self.date = datetime.datetime.fromisoformat(self.date_string).replace(
                     hour=0, minute=0, second=0
                 )
+
+
+@dataclass
+class RegularPlayer:
+    """Class used for storing regular players in the DB."""
+
+    player_id: int
+    guild_id: int
+    # Represents if the player is considered as regular at the moment
+    active: bool
+    # Represents if the next change needs to be done by privileged member
+    # member -> Only concened member can activate
+    # server -> Only member high permission user in server can activate
+    # none   -> All available users can activate
+    overruled: str = "none"
+    # Signals who activated this last
+    last_activated: str = "none"
