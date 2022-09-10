@@ -25,6 +25,7 @@ lib64
 include/
 parts/
 sdist/
+share/
 var/
 wheels/
 pip-wheel-metadata/

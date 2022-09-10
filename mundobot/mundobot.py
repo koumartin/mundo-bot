@@ -2,6 +2,7 @@
 Mundo bot class and commands for running it.
 """
 import asyncio
+from collections import namedtuple
 import os
 import queue
 import logging
@@ -9,7 +10,7 @@ import signal
 from datetime import datetime, timedelta
 import sys
 import traceback
-from typing import Dict, Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional
 from uuid import UUID, getnode
 import certifi
 
@@ -24,6 +25,7 @@ from mundobot.clash import Clash
 from mundobot.clash_api_service import ApiClash, ClashApiService
 from mundobot.clashmanager import ClashManager
 from mundobot.position import Position
+from mundobot.playback import PlaybackManager
 from mundobot import helpers
 
 # -------------------------------------------
@@ -37,15 +39,15 @@ LOCK_CHECK_TIMEOUT = 4 * 60  # 4 minutes
 LOCK_CHECK_TIMEOUT_OWNER = 60
 LOCK_CHECK_TIMEOUT_INITIAL = 5
 
+QueueStatus = namedtuple("QueueStatus", "playing stop")
+
 
 class MundoBot(commands.Bot):
     """Discord bot for playnig sounds in rooms and mannaging clash.
 
     Attributes:
         token (str): Discord API token used for communication.
-        mundo_queue (Dict[dc.Guild, queue.Queue]): Queue of voice channels to play sound in.
         clash_manager (ClashManager): Clashmanger instance of this bot.
-        accepted_reactions (List[str]): List of reaction names to react to.
         client (MongoClient): Client for accessing used mongodb.
     """
 
@@ -63,19 +65,17 @@ class MundoBot(commands.Bot):
         self.token = token
         self.path = os.path.dirname(os.path.abspath(__file__))
 
-        # Create global variables
-        self.playback_queue: Dict[dc.Guild, queue.Queue] = {}
-        # Value is tuple of (handling, stop)
-        self.playback_queue_handle: Dict[dc.Guild, Tuple[bool, bool]] = {}
-
         self.client = MongoClient(
             mongodbConnectionString,
             uuidRepresentation="standard",
             tlsCAFile=certifi.where(),
         )
+
         self.clash_manager = ClashManager(self.client)
-        self.accepted_reactions = Position.accepted_reactions()
         self.clash_api_service = ClashApiService()
+        self.playback_manager = PlaybackManager(
+            self.client, self.path, self.voice_clients
+        )
 
         self.identifier: UUID = UUID(int=getnode())
         self.is_singleton = False
@@ -154,7 +154,7 @@ class MundoBot(commands.Bot):
                     after.channel,
                     after.channel.guild,
                 )
-                await self.add_to_queue(member.guild, after.channel)
+                await self.playback_manager.add_to_queue(member.guild, after.channel)
 
         @self.event
         async def on_raw_reaction_add(reaction: dc.RawReactionActionEvent) -> None:
@@ -173,7 +173,7 @@ class MundoBot(commands.Bot):
                 if (
                     reaction.channel_id != clash.clash_channel_id
                     or reaction.message_id != clash.message_id
-                    or reaction.emoji.name not in self.accepted_reactions
+                    or reaction.emoji.name not in Position.accepted_reactions()
                 ):
                     continue
 
@@ -223,7 +223,7 @@ class MundoBot(commands.Bot):
                 if (
                     reaction.channel_id != clash.clash_channel_id
                     or reaction.message_id != clash.message_id
-                    or reaction.emoji.name not in self.accepted_reactions
+                    or reaction.emoji.name not in Position.accepted_reactions()
                 ):
                     continue
 
@@ -295,7 +295,7 @@ class MundoBot(commands.Bot):
                 voice_channel = None
 
             if voice_channel is not None:
-                await self.add_to_queue(ctx.guild, voice_channel, num)
+                await self.playback_manager.add_to_queue(ctx.guild, voice_channel, num)
             else:
                 await ctx.author.send("Mundo can't greet without voice channel.")
 
@@ -327,8 +327,7 @@ class MundoBot(commands.Bot):
 
             if voice_client is not None:
                 voice_client.stop()
-            self.playback_queue_handle[guild] = (True, True)
-            self.playback_queue[guild] = queue.Queue()
+            await self.playback_manager.shutup(guild)
 
         # -----------------------------------------------------
         # CLASH COMMANDS
@@ -549,13 +548,14 @@ class MundoBot(commands.Bot):
 
         @self.command()
         @self.single_handle()
-        async def test(_: Context) -> None:
+        async def test(_: Context, string) -> None:
             """Testing function
 
             Args:
                 ctx (Context): Context of the command.
             """
-            await self.run_notifications()
+            self.logger.info("Test")
+            self.playback_manager.download_and_save(string)
 
     # -----------------------------------------------------
     # HELPER FUNCTION FOR CLASH INSTANCES
@@ -695,91 +695,6 @@ class MundoBot(commands.Bot):
         for message_id in clash.notification_message_ids:
             message: dc.Message = await channel.fetch_message(message_id)
             await message.delete()
-
-    # -----------------------------------------------------
-    # MUNDO GREET ADDITIONAL METHODS
-    # -----------------------------------------------------
-    async def add_to_queue(
-        self, guild: dc.Guild, channel: dc.VoiceChannel, num: int = 1
-    ) -> None:
-        """Addes voice channel to the queue of channels to play sound in.
-
-        Args:
-            guild (dc.Guild): Guild in which the channel is located.
-            channel (dc.VoiceChannel): The channel in which to play sound.
-            num (int, optional): Number of times the sound is played. Defaults to 1.
-        """
-        if guild not in self.playback_queue:
-            self.playback_queue[guild] = queue.Queue()
-
-        # Put channel to a music queue
-        for _ in range(num):
-            self.playback_queue[guild].put(channel)
-
-        if guild not in self.playback_queue_handle:
-            self.playback_queue_handle[guild] = (False, False)
-
-        # If queue isn't already handled start handling it
-        if self.playback_queue_handle[guild][0] is False:
-            await self.play_from_queue(guild)
-
-    async def play_from_queue(self, guild: dc.Guild) -> None:
-        """Play sound in next channel of the queue.
-
-        Args:
-            guild (dc.Guild): Guild in which the playing of sounds is requested.
-        """
-        # Finds current voice_channel in this guild
-        voice_client = dc.utils.get(self.voice_clients, guild=guild)
-        i = 0
-
-        while not self.playback_queue[guild].empty():
-            _, stop = self.playback_queue_handle[guild]
-            if stop is True:
-                self.playback_queue_handle[guild] = (False, False)
-                return
-            else:
-                self.playback_queue_handle[guild] = (True, False)
-            channel = self.playback_queue[guild].get()
-            i += 1
-
-            # In case bot isn't connected to a voice_channel yet
-            if voice_client is None:
-                voice_client = await channel.connect()
-            # Else first disconnect bot from current channel and than connect it
-            else:
-                # Wait for current audio to stop playing
-                while voice_client.is_playing():
-                    await asyncio.sleep(0.1)
-                await voice_client.move_to(channel)
-
-            if i >= 5:
-                i = 0
-                await self.play_mundo_sound(
-                    voice_client, "../assets/mundo-say-name-often.mp3"
-                )
-            else:
-                await self.play_mundo_sound(voice_client, "../assets/muundo.mp3")
-
-            while voice_client.is_playing():
-                # Not clean but it iiiis what it iiiis
-                await asyncio.sleep(0.1)
-
-        if voice_client.is_connected():
-            await voice_client.disconnect()
-        self.playback_queue_handle[guild] = (False, False)
-
-    async def play_mundo_sound(
-        self, voice_client: dc.VoiceClient, file_name: str
-    ) -> None:
-        """Plays a sound specified by file_name in a VoiceClient.
-
-        Args:
-            voice_client (dc.VoiceClient): Voice client to play the sound.
-            file_name (str): Name of the sound file.
-        """
-        audio_path = os.path.join(self.path, file_name)
-        voice_client.play(dc.FFmpegPCMAudio(audio_path))
 
     # -----------------------------------------------------
     # PERIODIC CLASH MANAGEMENT METHODS
