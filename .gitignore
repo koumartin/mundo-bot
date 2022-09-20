@@ -36,6 +36,7 @@ share/python-wheels/
 MANIFEST
 Scripts/
 *log/
+mundobot/sounds/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
