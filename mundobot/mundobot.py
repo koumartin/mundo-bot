@@ -4,7 +4,6 @@ Mundo bot class and commands for running it.
 import asyncio
 from collections import namedtuple
 import os
-import queue
 import logging
 import signal
 from datetime import datetime, timedelta
@@ -154,7 +153,9 @@ class MundoBot(commands.Bot):
                     after.channel,
                     after.channel.guild,
                 )
-                await self.playback_manager.add_to_queue(member.guild, after.channel)
+                await self.playback_manager.add_to_queue(
+                    member.guild.id, after.channel, "mundo"
+                )
 
         @self.event
         async def on_raw_reaction_add(reaction: dc.RawReactionActionEvent) -> None:
@@ -267,10 +268,6 @@ class MundoBot(commands.Bot):
                 ctx (Context): Context of the command.
                 num (int, optional): Number of greetings commanded. Defaults to 1.
             """
-            # Guard for receiving command
-            # if not isinstance(ctx.author.voice, dc.TextChannel):
-            #     await ctx.author.send("Mundo can't greet without real channel.")
-            #     return
 
             await helpers.conditional_delete(ctx.message)
 
@@ -328,6 +325,47 @@ class MundoBot(commands.Bot):
             if voice_client is not None:
                 voice_client.stop()
             await self.playback_manager.shutup(guild)
+
+        @self.command()
+        @self.single_handle()
+        async def play_sound(ctx: Context, sound_name: str, number: int = 1) -> None:
+            if ctx.author.voice is not None:
+                voice_channel = ctx.author.voice.channel
+            else:
+                return
+            await self.playback_manager.add_to_queue(
+                ctx.guild.id, voice_channel, sound_name, number
+            )
+
+        @self.command()
+        @self.single_handle()
+        async def download(ctx: Context, sound_name: str, sound_url: str) -> None:
+            await helpers.conditional_delete(ctx.message)
+
+            if not await helpers.check_permissions(ctx.author):
+                return
+
+            self.playback_manager.download_and_save(sound_name, ctx.guild.id, sound_url)
+
+        @self.command()
+        @self.single_handle()
+        async def delete_sound(ctx: Context, sound_name: str) -> None:
+            await helpers.conditional_delete(ctx.message)
+
+            if not await helpers.check_permissions(ctx.author):
+                return
+
+            self.playback_manager.delete_sound(sound_name, ctx.guild.id)
+
+        @self.command()
+        @self.single_handle()
+        async def list_sounds(ctx: Context) -> None:
+            await helpers.conditional_delete(ctx.message)
+
+            await ctx.channel.send(
+                "Dostupné zvuky: \n"
+                + self.playback_manager.list_sounds_for_guild(ctx.guild.id)
+            )
 
         # -----------------------------------------------------
         # CLASH COMMANDS
@@ -548,14 +586,14 @@ class MundoBot(commands.Bot):
 
         @self.command()
         @self.single_handle()
-        async def test(_: Context, string) -> None:
+        async def test(ctx: Context, string, name) -> None:
             """Testing function
 
             Args:
                 ctx (Context): Context of the command.
             """
             self.logger.info("Test")
-            self.playback_manager.download_and_save(string)
+            self.playback_manager.download_and_save(name, ctx.guild.id, string)
 
     # -----------------------------------------------------
     # HELPER FUNCTION FOR CLASH INSTANCES
@@ -826,7 +864,7 @@ class MundoBot(commands.Bot):
 
         async def single_handle_check(_):
             if not self.is_singleton:
-                self.check_for_singleton(False)
+                await self.check_for_singleton(False)
             return self.is_singleton
 
         return commands.check(single_handle_check)
