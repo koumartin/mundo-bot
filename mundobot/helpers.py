@@ -33,16 +33,6 @@ def find_text_channel_by_name(guild: dc.Guild, name: str) -> dc.TextChannel:
     )
 
 
-async def conditional_delete(message: dc.Message) -> None:
-    """Deletes a message if it is in a TextChannel.
-
-    Args:
-        message (dc.Message): Message that might be deleted.
-    """
-    if isinstance(message.channel, dc.TextChannel):
-        await message.delete()
-
-
 def find_players(target: Position, players: List[PositionRecord]) -> str:
     """Gets names of all players with given position in registered players for clash.
 
