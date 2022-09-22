@@ -268,9 +268,6 @@ class MundoBot(commands.Bot):
                 ctx (Context): Context of the command.
                 num (int, optional): Number of greetings commanded. Defaults to 1.
             """
-
-            await helpers.conditional_delete(ctx.message)
-
             self.logger.info(
                 "%s called !mundo with n = %d in %s", ctx.author, num, ctx.guild
             )
@@ -300,15 +297,13 @@ class MundoBot(commands.Bot):
         @self.single_handle()
         async def shutup(ctx: Context, additional: str = "") -> None:
             """Commands the bot to stop repeating greetings after ending current one.
-            Users without TODO permission have to add please parameter.
+            Users without server permissions have to add "please" parameter.
 
             Args:
                 ctx (Context): Context of the command.
                 additional (str, optional): Additional string value used to say please.
                     Defaults to "".
             """
-            await helpers.conditional_delete(ctx.message)
-
             guild = ctx.guild
             voice_client = dc.utils.get(self.voice_clients, guild=guild)
 
@@ -329,10 +324,25 @@ class MundoBot(commands.Bot):
         @self.command()
         @self.single_handle()
         async def play_sound(ctx: Context, sound_name: str, number: int = 1) -> None:
+            """Play one of the sounds available to the server number of times.
+
+            Args:
+                ctx (Context): Context of the command.
+                sound_name (str): Name of the sound.
+                number (int, optional): Number of repetitions. Defaults to 1.
+            """
             if ctx.author.voice is not None:
                 voice_channel = ctx.author.voice.channel
             else:
                 return
+
+            self.logger.info(
+                "%s called !play_sound with sound name %s in %s %d times.",
+                ctx.author,
+                sound_name,
+                ctx.guild,
+                number,
+            )
             await self.playback_manager.add_to_queue(
                 ctx.guild.id, voice_channel, sound_name, number
             )
@@ -340,27 +350,61 @@ class MundoBot(commands.Bot):
         @self.command()
         @self.single_handle()
         async def download(ctx: Context, sound_name: str, sound_url: str) -> None:
-            await helpers.conditional_delete(ctx.message)
+            """Downloads a sound from google drive link and saves it.
 
+            Args:
+                ctx (Context): Context of the command.
+                sound_name (str): Name of the sound.
+                sound_url (str): Direct download url of the sound.
+            """
             if not await helpers.check_permissions(ctx.author):
                 return
+
+            self.logger.info(
+                "%s wants to !download sound %s from %s in %s.",
+                ctx.author,
+                sound_name,
+                sound_url,
+                ctx.guild,
+            )
 
             self.playback_manager.download_and_save(sound_name, ctx.guild.id, sound_url)
 
         @self.command()
         @self.single_handle()
         async def delete_sound(ctx: Context, sound_name: str) -> None:
-            await helpers.conditional_delete(ctx.message)
+            """Deletes saved sound for a server.
 
+            Args:
+                ctx (Context): Context of the command.
+                sound_name (str): Name of the sound.
+            """
             if not await helpers.check_permissions(ctx.author):
                 return
+
+            self.logger.info(
+                "%s called !delete_sound with sound name %s in %s.",
+                ctx.author,
+                sound_name,
+                ctx.guild,
+            )
 
             self.playback_manager.delete_sound(sound_name, ctx.guild.id)
 
         @self.command()
         @self.single_handle()
         async def list_sounds(ctx: Context) -> None:
-            await helpers.conditional_delete(ctx.message)
+            """Gives a list of sounds available to a server.
+
+            Args:
+                ctx (Context): Context of the sound.
+            """
+
+            self.logger.info(
+                "%s called !list_sounds in %s.",
+                ctx.author,
+                ctx.guild,
+            )
 
             await ctx.channel.send(
                 "Dostupné zvuky: \n"
@@ -373,8 +417,7 @@ class MundoBot(commands.Bot):
         @self.command()
         @self.single_handle()
         async def add_clash(ctx: Context, clash_name: str, date: str) -> None:
-            """Adds clash to the list of registered clashes and creates a
-            channel, role and registration message for it.
+            """Adds clash to the list of registered clashes for server.
 
             DEPRECATED
             ---
@@ -384,8 +427,6 @@ class MundoBot(commands.Bot):
                 clash_name (str): Name of the clash to be added.
                 date (str): Date in d/m/Y format.
             """
-            await helpers.conditional_delete(ctx.message)
-
             if not await helpers.check_permissions(ctx.author):
                 return
 
@@ -407,8 +448,6 @@ class MundoBot(commands.Bot):
                 ctx (Context): Context of the command.
                 clash_name (str): Name of the clash to be removed.
             """
-            await helpers.conditional_delete(ctx.message)
-
             if not await helpers.check_permissions(ctx.author):
                 return
 
@@ -426,8 +465,6 @@ class MundoBot(commands.Bot):
             Args:
                 ctx (Context): Context of the command.
             """
-            await helpers.conditional_delete(ctx.message)
-
             if not await helpers.check_permissions(ctx.author):
                 return
 
@@ -444,8 +481,6 @@ class MundoBot(commands.Bot):
             Args:
                 ctx (Context): Context of the command
             """
-            await helpers.conditional_delete(ctx.message)
-
             if not await helpers.check_permissions(ctx.author):
                 return
 
@@ -468,8 +503,6 @@ class MundoBot(commands.Bot):
             Args:
                 ctx (Context): Context of the command
             """
-            await helpers.conditional_delete(ctx.message)
-
             if not await helpers.check_permissions(ctx.author):
                 return
 
@@ -487,8 +520,11 @@ class MundoBot(commands.Bot):
         @self.command()
         @self.single_handle()
         async def regular_players(ctx: Context) -> None:
-            await helpers.conditional_delete(ctx.message)
+            """Gets all regular players in the server.
 
+            Args:
+                ctx (Context): Context of the command.
+            """
             guild: dc.Guild = ctx.guild
             self.logger.info(
                 "Getting list of regular players in %s",
@@ -505,8 +541,13 @@ class MundoBot(commands.Bot):
         @self.command()
         @self.single_handle()
         async def register_as_regular(ctx: Context, name: Optional[str] = None) -> None:
-            await helpers.conditional_delete(ctx.message)
+            """Registers self or other player as regular clash player.
 
+            Args:
+                ctx (Context): Context of the command.
+                name (Optional[str], optional): Name of the player.
+                This requires server permissions. Defaults to None.
+            """
             guild: dc.Guild = ctx.guild
             player: dc.Member
             if name is None:
@@ -544,9 +585,16 @@ class MundoBot(commands.Bot):
 
         @self.command()
         @self.single_handle()
-        async def unregister_as_regular(ctx: Context, name: Optional[str]) -> None:
-            await helpers.conditional_delete(ctx.message)
+        async def unregister_as_regular(
+            ctx: Context, name: Optional[str] = None
+        ) -> None:
+            """Unregisters self or other player from regular clash players.
 
+            Args:
+                ctx (Context): Context of the command.
+                name (Optional[str], optional): Name of the player.
+                This requires server permissions. Defaults to None.
+            """
             guild: dc.Guild = ctx.guild
             player: dc.Member
             if name is None:
@@ -592,6 +640,9 @@ class MundoBot(commands.Bot):
             Args:
                 ctx (Context): Context of the command.
             """
+            if not await helpers.check_permissions(ctx.author):
+                return
+
             self.logger.info("Test")
             self.playback_manager.download_and_save(name, ctx.guild.id, string)
 
