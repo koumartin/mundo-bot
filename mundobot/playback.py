@@ -112,15 +112,18 @@ class PlaybackManager:
                 mundo_repetitions + 1 if playback_item.sound == "mundo" else 0
             )
 
+            print(voice_client.channel if voice_client is not None else None, playback_item.channel)
             # In case bot isn't connected to a voice_channel yet
             if voice_client is None:
                 voice_client = await playback_item.channel.connect()
+                await asyncio.sleep(2)
             # Else first disconnect bot from current channel and than connect it
-            else:
+            elif voice_client.channel is not playback_item.channel:
                 # Wait for current audio to stop playing
                 while voice_client.is_playing():
                     await asyncio.sleep(0.1)
                 await voice_client.move_to(playback_item.channel)
+                await asyncio.sleep(2)
 
             if mundo_repetitions >= 5:
                 mundo_repetitions = 0
@@ -146,7 +149,8 @@ class PlaybackManager:
             file_name (str): Name of the sound file.
         """
         path = self.find_sound(sound_name, guild_id)
-        voice_client.play(dc.FFmpegPCMAudio(str(path)))
+        audio = dc.FFmpegPCMAudio(str(path))
+        voice_client.play(audio)
 
     def download_and_save(self, sound_name: str, guild_id: int, sound_url: str) -> bool:
         """Downloads a sound from google drive using direct download link
