@@ -26,7 +26,7 @@ if mongodb == "Docker":
             f"mongodb://{quote_plus(username)}:{quote_plus(password)}@mongodb:27017"
         )
 elif mongodb == "External":
-    connection_string = os.environ.get("MongodbConnectionString")
+    connection_string = os.environ.get("mongodbConnectionString")
 else:
     connection_string = (
         f"mongodb://{quote_plus(username)}:{quote_plus(password)}@localhost:27017"

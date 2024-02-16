@@ -60,7 +60,7 @@ class MundoBot(commands.Bot):
         intents: dc.Intents = dc.Intents.default()
         intents.members = True  # pylint: disable=assigning-non-slot
         commands.Bot.__init__(self, command_prefix="!", intents=intents)
-
+        
         self.token = token
         self.path = os.path.dirname(os.path.abspath(__file__))
 
@@ -92,7 +92,7 @@ class MundoBot(commands.Bot):
 
     def start_running(self) -> None:
         """Commands the bot to log in and start running using its api token."""
-        self.loop.create_task(self.check_for_singleton_job())
+        self.loop.create_task(self.check_for_singleton_job()) 
         self.run(self.token)
 
     def add_all_commands(self) -> None:
