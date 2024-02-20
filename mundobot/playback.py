@@ -116,14 +116,14 @@ class PlaybackManager:
             # In case bot isn't connected to a voice_channel yet
             if voice_client is None:
                 voice_client = await playback_item.channel.connect()
-                await asyncio.sleep(2)
+                await asyncio.sleep(1.5)
             # Else first disconnect bot from current channel and than connect it
             elif voice_client.channel is not playback_item.channel:
                 # Wait for current audio to stop playing
                 while voice_client.is_playing():
                     await asyncio.sleep(0.1)
                 await voice_client.move_to(playback_item.channel)
-                await asyncio.sleep(2)
+                await asyncio.sleep(1.5)
 
             if mundo_repetitions >= 5:
                 mundo_repetitions = 0
