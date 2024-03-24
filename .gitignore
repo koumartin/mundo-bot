@@ -25,6 +25,7 @@ lib64
 include/
 parts/
 sdist/
+share/
 var/
 wheels/
 pip-wheel-metadata/
@@ -33,6 +34,9 @@ share/python-wheels/
 .installed.cfg
 *.egg
 MANIFEST
+Scripts/
+*log/
+mundobot/sounds/
 
 # PyInstaller
 #  Usually these files are written by a python script from a template
@@ -116,6 +120,7 @@ venv/
 ENV/
 env.bak/
 venv.bak/
+pyvenv.cfg
 
 # Spyder project settings
 .spyderproject

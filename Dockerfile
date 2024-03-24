@@ -8,5 +8,5 @@ RUN pip3 install -r requirements.txt
 RUN apt-get install -y ffmpeg
 COPY . .
 
-CMD [ "python3", "-m", "mundobot.mundobot" ]
+CMD [ "python3", "-m", "mundobot.main" ]
 

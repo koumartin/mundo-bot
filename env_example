@@ -1,0 +1,7 @@
+riotApiKey=<Riot games API key>
+botToken=<Discord bot token>
+mongodb=<Docker usage method: Docker/External/"">
+dockerContainer=<conatainer name>
+mongoUsername=<>
+mongoPassword=<>
+mongodbConnectionString=<connection string to external database>
