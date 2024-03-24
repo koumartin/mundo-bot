@@ -9,6 +9,12 @@ commands:
 !add_clash name date - Adds Clash to database and opens registrations.   
 !remove_clash name - Removes Clash and all associated messages, roles and channels.   
 
-## Required permissions:
+## Required discord permissions:
 Send messages, Manage messages, Connect, Speak, Use slash commands   
 And MORE not sure yet...
+
+## Supported environment
+Currently supported environment uses:  
+Ubuntu 22.**  
+Python 3.11  
+FFMPEG installed through apt-get repository  
