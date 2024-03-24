@@ -59,6 +59,7 @@ class MundoBot(commands.Bot):
         """
         intents: dc.Intents = dc.Intents.default()
         intents.members = True  # pylint: disable=assigning-non-slot
+
         commands.Bot.__init__(self, command_prefix="!", intents=intents)
         
         self.token = token
@@ -77,10 +78,8 @@ class MundoBot(commands.Bot):
         )
 
         self.identifier: UUID = UUID(int=getnode())
-        self.is_singleton = False
         self.checking_done = False
         self.job: Optional[schedule.Job] = None
-        self.singleton_collection = self.client.bot.singleton
 
         self.logger = helpers.prepare_logging(
             "bot",
@@ -92,7 +91,6 @@ class MundoBot(commands.Bot):
 
     def start_running(self) -> None:
         """Commands the bot to log in and start running using its api token."""
-        self.loop.create_task(self.check_for_singleton_job()) 
         self.run(self.token)
 
     def add_all_commands(self) -> None:
@@ -137,9 +135,6 @@ class MundoBot(commands.Bot):
                 before (dc.VoiceState): Original voice state including channel.
                 after (dc.VoiceState): New voice state including channel.
             """
-            if not self.is_singleton:
-                return
-
             # Ignores himself moving
             if member == self.user:
                 return
@@ -165,9 +160,6 @@ class MundoBot(commands.Bot):
             Args:
                 reaction (dc.RawReactionActionEvent): Event of adding reaction
             """
-            if not self.is_singleton:
-                return
-
             # Checks if reaction was made on one of initial messages
             for clash_entry in self.clash_manager.clashes_for_guild(reaction.guild_id):
                 clash: Clash = from_dict(Clash, clash_entry)
@@ -215,9 +207,6 @@ class MundoBot(commands.Bot):
             Args:
                 reaction (dc.RawReactionActionEvent): Event of removing reaction.
             """
-            if not self.is_singleton:
-                return
-
             # Checks if reaction was made on one of initial messages
             for clash_entry in self.clash_manager.clashes_for_guild(reaction.guild_id):
                 clash: Clash = from_dict(Clash, clash_entry)
@@ -260,7 +249,6 @@ class MundoBot(commands.Bot):
         # MUNDO GREET COMMANDS
         # -----------------------------------------------------
         @self.command()
-        @self.single_handle()
         async def mundo(ctx: Context, num: int = 1) -> None:
             """Commands the bot to come into users channel and repeat num times a greeting.
 
@@ -294,7 +282,6 @@ class MundoBot(commands.Bot):
                 await ctx.author.send("Mundo can't greet without voice channel.")
 
         @self.command()
-        @self.single_handle()
         async def shutup(ctx: Context, additional: str = "") -> None:
             """Commands the bot to stop repeating greetings after ending current one.
             Users without server permissions have to add "please" parameter.
@@ -322,7 +309,6 @@ class MundoBot(commands.Bot):
             await self.playback_manager.shutup(guild)
 
         @self.command()
-        @self.single_handle()
         async def play_sound(ctx: Context, sound_name: str, number: int = 1) -> None:
             """Play one of the sounds available to the server number of times.
 
@@ -348,7 +334,6 @@ class MundoBot(commands.Bot):
             )
 
         @self.command()
-        @self.single_handle()
         async def download(ctx: Context, sound_name: str, sound_url: str) -> None:
             """Downloads a sound from google drive link and saves it.
 
@@ -371,7 +356,6 @@ class MundoBot(commands.Bot):
             self.playback_manager.download_and_save(sound_name, ctx.guild.id, sound_url)
 
         @self.command()
-        @self.single_handle()
         async def delete_sound(ctx: Context, sound_name: str) -> None:
             """Deletes saved sound for a server.
 
@@ -392,7 +376,6 @@ class MundoBot(commands.Bot):
             self.playback_manager.delete_sound(sound_name, ctx.guild.id)
 
         @self.command()
-        @self.single_handle()
         async def list_sounds(ctx: Context) -> None:
             """Gives a list of sounds available to a server.
 
@@ -415,7 +398,6 @@ class MundoBot(commands.Bot):
         # CLASH COMMANDS
         # -----------------------------------------------------
         @self.command()
-        @self.single_handle()
         async def add_clash(ctx: Context, clash_name: str, date: str) -> None:
             """Adds clash to the list of registered clashes for server.
 
@@ -437,7 +419,6 @@ class MundoBot(commands.Bot):
             await self.add_clash_internal(ctx.guild, clash_name, date, ctx.author)
 
         @self.command()
-        @self.single_handle()
         async def remove_clash(ctx: Context, clash_name: str) -> None:
             """Removes clash and all asociated lists, channels and roles.
 
@@ -458,7 +439,6 @@ class MundoBot(commands.Bot):
             await self.remove_clash_internal(ctx.guild, clash_name)
 
         @self.command()
-        @self.single_handle()
         async def load_clashes(ctx: Context) -> None:
             """Loads clashes for callers server.
 
@@ -474,7 +454,6 @@ class MundoBot(commands.Bot):
             await self.load_clashes_for_guild(guild.id)
 
         @self.command()
-        @self.single_handle()
         async def register_server(ctx: Context) -> None:
             """Registers a clash server to receive notifications about clashes.
 
@@ -496,7 +475,6 @@ class MundoBot(commands.Bot):
                 )
 
         @self.command()
-        @self.single_handle()
         async def unregister_server(ctx: Context) -> None:
             """Unregisters a clash server from receiving notifications about clashes.
 
@@ -518,7 +496,6 @@ class MundoBot(commands.Bot):
                 )
 
         @self.command()
-        @self.single_handle()
         async def regular_players(ctx: Context) -> None:
             """Gets all regular players in the server.
 
@@ -531,7 +508,7 @@ class MundoBot(commands.Bot):
                 guild.name,
             )
             regular_player_ids = self.clash_manager.regular_players_for_guild(guild.id)
-            regular_players: Iterable[dc.Member | None] = map(
+            regular_players: Iterable[str | None] = map(
                 lambda x: guild.get_member(x).name, regular_player_ids
             )
 
@@ -539,7 +516,6 @@ class MundoBot(commands.Bot):
             await ctx.channel.send(message)
 
         @self.command()
-        @self.single_handle()
         async def register_as_regular(ctx: Context, name: Optional[str] = None) -> None:
             """Registers self or other player as regular clash player.
 
@@ -564,7 +540,7 @@ class MundoBot(commands.Bot):
             )
 
             if player is None:
-                ctx.author.send("Hráč neexistuje.")
+                await ctx.author.send("Hráč neexistuje.")
                 return
 
             try:
@@ -584,7 +560,6 @@ class MundoBot(commands.Bot):
                 await player.send("Nyní jsi častým hráčem na serveru " + guild.name)
 
         @self.command()
-        @self.single_handle()
         async def unregister_as_regular(
             ctx: Context, name: Optional[str] = None
         ) -> None:
@@ -605,7 +580,7 @@ class MundoBot(commands.Bot):
                 player = guild.get_member_named(name)
 
             if player is None:
-                ctx.author.send("Hráč neexistuje.")
+                await ctx.author.send("Hráč neexistuje.")
                 return
 
             self.logger.info(
@@ -633,7 +608,6 @@ class MundoBot(commands.Bot):
                 await player.send("Nadále nejsi častým hráčem na serveru " + guild.name)
 
         @self.command()
-        @self.single_handle()
         async def test(ctx: Context, string, name) -> None:
             """Testing function
 
@@ -833,101 +807,10 @@ class MundoBot(commands.Bot):
 
         await self.run_notifications()
 
-    # -----------------------------------------------------
-    # SINGLETON METHODS
-    # -----------------------------------------------------
-    def set_checking_not_done(self):
-        """Sets checking done to false."""
-        self.checking_done = False
-
-    async def gain_control(self) -> None:
-        """Gains control over singleton and schedules periodic tasks."""
-        self.is_singleton = True
-        self.job = schedule.every(1).hours.do(self.set_checking_not_done)
-
-    async def check_for_singleton(self, run_checking: bool) -> bool:
-        """Checks for singleton and refreshes it or gains it if possible."""
-        current_value = self.singleton_collection.find_one()
-
-        # Uninitialized singleton is initialized and singleton lock is gained
-        if current_value is None or not current_value["singleton_id"]:
-            self.logger.info("Initializing singleton")
-            self.singleton_collection.insert_one(
-                {
-                    "singleton_id": self.identifier,
-                    "valid_until": datetime.now()
-                    + timedelta(minutes=LOCK_REFRESH_TIMEOUT),
-                }
-            )
-            await self.gain_control()
-        # Singleton lock is held and refreshed
-        elif current_value["singleton_id"] == self.identifier:
-            self.logger.info("Refreshing singleton lock")
-            new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
-            self.singleton_collection.update_one(
-                {"_id": current_value["_id"]},
-                {"$set": {"valid_until": new_time}},
-            )
-            if not self.is_singleton:
-                await self.gain_control()
-        # Singleton lock is gained
-        elif datetime.now() > current_value["valid_until"]:
-            self.logger.info("Gaining singleton lock")
-            new_time = datetime.now() + timedelta(minutes=LOCK_REFRESH_TIMEOUT)
-            self.singleton_collection.update_one(
-                {"_id": current_value["_id"]},
-                {
-                    "$set": {
-                        "singleton_id": self.identifier,
-                        "valid_until": new_time,
-                    }
-                },
-            )
-            await self.gain_control()
-        # Singleton lock is held by diffenet instance
-        else:
-            self.logger.info("Waiting for singleton clearing")
-            if self.is_singleton:
-                self.logger.info("Losing singleton instance")
-                self.is_singleton = False
-                if self.job is not None:
-                    schedule.cancel_job(self.job)
-
-        if run_checking and self.is_singleton and not self.checking_done:
-            await self.run_clash_checking()
-
-    async def check_for_singleton_job(self) -> None:
-        """Checks for singleton property in database.
-        Makes itself the singleton in case the old one is not refreshed.
-        Refreshes if currently being singleton.
-        """
-        await asyncio.sleep(LOCK_CHECK_TIMEOUT_INITIAL)
-        while True:
-            await self.check_for_singleton(True)
-            await asyncio.sleep(
-                LOCK_CHECK_TIMEOUT
-                if not self.is_singleton
-                else LOCK_CHECK_TIMEOUT_OWNER
-            )
-
-    def single_handle(self):
-        """Decorator that allows to check if instance is singleton holder."""
-
-        async def single_handle_check(_):
-            if not self.is_singleton:
-                await self.check_for_singleton(False)
-            return self.is_singleton
-
-        return commands.check(single_handle_check)
-
+    # Maybe redundant
     async def termination_handler(self):
-        """Shortens own singleton lock during termination."""
-        self.logger.info("Terminating bot. Shortening singleton lock time.")
-        if self.is_singleton:
-            self.singleton_collection.update_one(
-                {},
-                {"$set": {"valid_until": datetime.now()}},
-            )
+        """Closes the bot."""
+        self.logger.info("Terminating bot.")
         await self.close()
 
     # # -----------------------------------------------------
