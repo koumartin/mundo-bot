@@ -1,7 +1,13 @@
-riotApiKey=<Riot games API key>
-botToken=<Discord bot token>
-mongodb=<Docker usage method: Docker/External/"">
-dockerContainer=<conatainer name>
-mongoUsername=<>
-mongoPassword=<>
-mongodbConnectionString=<connection string to external database>
+RIOT_API_KEY=<Riot games API key>
+BOT_TOKEN=<Discord bot token>
+MONGODB=<Docker usage method: Docker/External/"">
+DOCKER_CONTAINER=<conatainer name>
+MONGO_USERNAME=<>
+MONGO_PASSWORD=<>
+MONGO_CONNECTION_STRING=<connection string to external database>
+RUN_API=<True / False>
+
+APP_DISCORD_ID=<Id of app in discord developer portal>
+APP_DISCORD_SECRET=<Secret of app in discord developer portal>
+NEXTAUTH_SECRET='secret'
+API_PATH=''

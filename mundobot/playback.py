@@ -61,7 +61,7 @@ class PlaybackManager:
         Args:
             guild_id (int): Id of guild in which the channel is located.
             channel (dc.VoiceChannel): The channel in which to play sound.
-            sound (str, optional): Sound which should be played.
+            sound_name (str, optional): Sound which should be played.
             num (int, optional): Number of times the sound is played. Defaults to 1.
         """
         if guild_id not in self.playback_queue:

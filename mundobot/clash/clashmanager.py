@@ -7,14 +7,14 @@ from typing import Any, Dict, List, Tuple
 from pymongo import MongoClient, collection, cursor
 from dacite import from_dict
 
-from mundobot.clash import Clash, RegularPlayer
-from mundobot.position import (
+from mundobot.clash.clash import Clash, RegularPlayer
+from mundobot.clash.position import (
     Position,
     PositionRecord,
     ClashPositions,
     DACITE_POSITION_CONFIG,
 )
-from mundobot.clash_api_service import ApiClash
+from mundobot.clash.clash_api_service import ApiClash
 from mundobot import helpers
 
 

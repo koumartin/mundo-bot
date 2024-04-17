@@ -1,5 +1,5 @@
 from bson import ObjectId
-from mundobot.position import Position, PositionRecord, ClashPositions
+from mundobot.clash.position import Position, ClashPositions
 from dacite import from_dict, config
 
 dictionary = {

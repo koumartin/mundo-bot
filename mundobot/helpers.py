@@ -4,8 +4,8 @@ import logging
 import os
 from typing import List, Optional
 import discord as dc
-from mundobot.position import Position, ClashPositions, PositionRecord
-from mundobot.clash import Clash
+from mundobot.clash.position import Position, ClashPositions, PositionRecord
+from mundobot.clash.clash import Clash
 
 
 # Predefined times at which notifications for clash will happen

@@ -6,7 +6,7 @@ from collections import namedtuple
 import os
 import logging
 import signal
-from datetime import datetime, timedelta
+from datetime import datetime
 import sys
 import traceback
 from typing import Iterable, List, Optional
@@ -20,10 +20,10 @@ from discord.ext.commands.context import Context
 from pymongo import MongoClient
 import schedule
 
-from mundobot.clash import Clash
-from mundobot.clash_api_service import ApiClash, ClashApiService
-from mundobot.clashmanager import ClashManager
-from mundobot.position import Position
+from mundobot.clash.clash import Clash
+from mundobot.clash.clash_api_service import ApiClash, ClashApiService
+from mundobot.clash.clashmanager import ClashManager
+from mundobot.clash.position import Position
 from mundobot.playback import PlaybackManager
 from mundobot import helpers
 
@@ -89,8 +89,13 @@ class MundoBot(commands.Bot):
         )
         self.add_all_commands()
 
-    def start_running(self) -> None:
+    async def start_running(self) -> None:
         """Commands the bot to log in and start running using its api token."""
+        await self.start(self.token)
+
+        # self.run(self.token)
+
+    def start_running_managed(self):
         self.run(self.token)
 
     def add_all_commands(self) -> None:
