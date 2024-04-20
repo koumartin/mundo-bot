@@ -2,11 +2,13 @@
   "name": "mundobot-app",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint"
+    "lint": "next lint",
+    "api": "npx @openapitools/openapi-generator-cli generate -g typescript-axios -o $(pwd)/src/api -i http://localhost:8000/openapi.json --additional-properties=supportsES6=true"
   },
   "dependencies": {
     "dotenv": "^16.4.5",
@@ -16,6 +18,7 @@
     "next-auth": "^4.24.7",
     "primereact": "^10.6.3",
     "react": "^18",
+    "react-cookie": "^7.1.4",
     "react-dom": "^18"
   },
   "devDependencies": {

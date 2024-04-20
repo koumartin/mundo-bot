@@ -26,6 +26,25 @@ import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerM
 /**
  * 
  * @export
+ * @interface GuildDto
+ */
+export interface GuildDto {
+    /**
+     * 
+     * @type {number}
+     * @memberof GuildDto
+     */
+    'id': number;
+    /**
+     * 
+     * @type {string}
+     * @memberof GuildDto
+     */
+    'name': string;
+}
+/**
+ * 
+ * @export
  * @interface HTTPValidationError
  */
 export interface HTTPValidationError {
@@ -96,183 +115,11 @@ export const DefaultApiAxiosParamCreator = function (configuration?: Configurati
     return {
         /**
          * 
-         * @summary Available Guilds
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        availableGuildsAvailableGuildsGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/available-guilds`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary Create Sound
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        createSoundSoundsCreatePost: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            const localVarPath = `/sounds/create`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary Delete Sound
-         * @param {string} soundName 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deleteSoundSoundsSoundNameDelete: async (soundName: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'soundName' is not null or undefined
-            assertParamExists('deleteSoundSoundsSoundNameDelete', 'soundName', soundName)
-            const localVarPath = `/sounds/{sound_name}`
-                .replace(`{${"sound_name"}}`, encodeURIComponent(String(soundName)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary Get Sound
-         * @param {string} soundName 
-         * @param {string} guildId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getSoundSoundsSoundNameGet: async (soundName: string, guildId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'soundName' is not null or undefined
-            assertParamExists('getSoundSoundsSoundNameGet', 'soundName', soundName)
-            // verify required parameter 'guildId' is not null or undefined
-            assertParamExists('getSoundSoundsSoundNameGet', 'guildId', guildId)
-            const localVarPath = `/sounds/{sound_name}`
-                .replace(`{${"sound_name"}}`, encodeURIComponent(String(soundName)));
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            if (guildId !== undefined) {
-                localVarQueryParameter['guild_id'] = guildId;
-            }
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
-         * @summary List Sounds
-         * @param {string} guildId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        listSoundsSoundsListGet: async (guildId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
-            // verify required parameter 'guildId' is not null or undefined
-            assertParamExists('listSoundsSoundsListGet', 'guildId', guildId)
-            const localVarPath = `/sounds/list`;
-            // use dummy base URL string because the URL constructor only accepts absolute URLs.
-            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
-            let baseOptions;
-            if (configuration) {
-                baseOptions = configuration.baseOptions;
-            }
-
-            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
-            const localVarHeaderParameter = {} as any;
-            const localVarQueryParameter = {} as any;
-
-            if (guildId !== undefined) {
-                localVarQueryParameter['guild_id'] = guildId;
-            }
-
-
-    
-            setSearchParams(localVarUrlObj, localVarQueryParameter);
-            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
-            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
-
-            return {
-                url: toPathString(localVarUrlObj),
-                options: localVarRequestOptions,
-            };
-        },
-        /**
-         * 
          * @summary Root
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        rootGet: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        root: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             const localVarPath = `/`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -312,78 +159,14 @@ export const DefaultApiFp = function(configuration?: Configuration) {
     return {
         /**
          * 
-         * @summary Available Guilds
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async availableGuildsAvailableGuildsGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<number>>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.availableGuildsAvailableGuildsGet(options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.availableGuildsAvailableGuildsGet']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
-         * @summary Create Sound
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async createSoundSoundsCreatePost(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<string>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.createSoundSoundsCreatePost(options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.createSoundSoundsCreatePost']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
-         * @summary Delete Sound
-         * @param {string} soundName 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async deleteSoundSoundsSoundNameDelete(soundName: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<boolean>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteSoundSoundsSoundNameDelete(soundName, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.deleteSoundSoundsSoundNameDelete']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
-         * @summary Get Sound
-         * @param {string} soundName 
-         * @param {string} guildId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async getSoundSoundsSoundNameGet(soundName: string, guildId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<any>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.getSoundSoundsSoundNameGet(soundName, guildId, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.getSoundSoundsSoundNameGet']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
-         * @summary List Sounds
-         * @param {string} guildId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        async listSoundsSoundsListGet(guildId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<string>>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.listSoundsSoundsListGet(guildId, options);
-            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.listSoundsSoundsListGet']?.[localVarOperationServerIndex]?.url;
-            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
-        },
-        /**
-         * 
          * @summary Root
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async rootGet(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<string>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.rootGet(options);
+        async root(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<string>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.root(options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['DefaultApi.rootGet']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['DefaultApi.root']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
     }
@@ -398,61 +181,12 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
     return {
         /**
          * 
-         * @summary Available Guilds
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        availableGuildsAvailableGuildsGet(options?: any): AxiosPromise<Array<number>> {
-            return localVarFp.availableGuildsAvailableGuildsGet(options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Create Sound
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        createSoundSoundsCreatePost(options?: any): AxiosPromise<string> {
-            return localVarFp.createSoundSoundsCreatePost(options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Delete Sound
-         * @param {string} soundName 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        deleteSoundSoundsSoundNameDelete(soundName: string, options?: any): AxiosPromise<boolean> {
-            return localVarFp.deleteSoundSoundsSoundNameDelete(soundName, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary Get Sound
-         * @param {string} soundName 
-         * @param {string} guildId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        getSoundSoundsSoundNameGet(soundName: string, guildId: string, options?: any): AxiosPromise<any> {
-            return localVarFp.getSoundSoundsSoundNameGet(soundName, guildId, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
-         * @summary List Sounds
-         * @param {string} guildId 
-         * @param {*} [options] Override http request option.
-         * @throws {RequiredError}
-         */
-        listSoundsSoundsListGet(guildId: string, options?: any): AxiosPromise<Array<string>> {
-            return localVarFp.listSoundsSoundsListGet(guildId, options).then((request) => request(axios, basePath));
-        },
-        /**
-         * 
          * @summary Root
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        rootGet(options?: any): AxiosPromise<string> {
-            return localVarFp.rootGet(options).then((request) => request(axios, basePath));
+        root(options?: any): AxiosPromise<string> {
+            return localVarFp.root(options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -466,72 +200,118 @@ export const DefaultApiFactory = function (configuration?: Configuration, basePa
 export class DefaultApi extends BaseAPI {
     /**
      * 
-     * @summary Available Guilds
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof DefaultApi
-     */
-    public availableGuildsAvailableGuildsGet(options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).availableGuildsAvailableGuildsGet(options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Create Sound
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof DefaultApi
-     */
-    public createSoundSoundsCreatePost(options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).createSoundSoundsCreatePost(options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Delete Sound
-     * @param {string} soundName 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof DefaultApi
-     */
-    public deleteSoundSoundsSoundNameDelete(soundName: string, options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).deleteSoundSoundsSoundNameDelete(soundName, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary Get Sound
-     * @param {string} soundName 
-     * @param {string} guildId 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof DefaultApi
-     */
-    public getSoundSoundsSoundNameGet(soundName: string, guildId: string, options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).getSoundSoundsSoundNameGet(soundName, guildId, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
-     * @summary List Sounds
-     * @param {string} guildId 
-     * @param {*} [options] Override http request option.
-     * @throws {RequiredError}
-     * @memberof DefaultApi
-     */
-    public listSoundsSoundsListGet(guildId: string, options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).listSoundsSoundsListGet(guildId, options).then((request) => request(this.axios, this.basePath));
-    }
-
-    /**
-     * 
      * @summary Root
      * @param {*} [options] Override http request option.
      * @throws {RequiredError}
      * @memberof DefaultApi
      */
-    public rootGet(options?: RawAxiosRequestConfig) {
-        return DefaultApiFp(this.configuration).rootGet(options).then((request) => request(this.axios, this.basePath));
+    public root(options?: RawAxiosRequestConfig) {
+        return DefaultApiFp(this.configuration).root(options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * GuildsApi - axios parameter creator
+ * @export
+ */
+export const GuildsApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Available Guilds
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        availableGuilds: async (options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            const localVarPath = `/available-guilds`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            // authentication OAuth2PasswordBearer required
+            // oauth required
+            await setOAuthToObject(localVarHeaderParameter, "OAuth2PasswordBearer", [], configuration)
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * GuildsApi - functional programming interface
+ * @export
+ */
+export const GuildsApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = GuildsApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Available Guilds
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async availableGuilds(options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<GuildDto>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.availableGuilds(options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['GuildsApi.availableGuilds']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * GuildsApi - factory interface
+ * @export
+ */
+export const GuildsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = GuildsApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Available Guilds
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        availableGuilds(options?: any): AxiosPromise<Array<GuildDto>> {
+            return localVarFp.availableGuilds(options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * GuildsApi - object-oriented interface
+ * @export
+ * @class GuildsApi
+ * @extends {BaseAPI}
+ */
+export class GuildsApi extends BaseAPI {
+    /**
+     * 
+     * @summary Available Guilds
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof GuildsApi
+     */
+    public availableGuilds(options?: RawAxiosRequestConfig) {
+        return GuildsApiFp(this.configuration).availableGuilds(options).then((request) => request(this.axios, this.basePath));
     }
 }
 
@@ -550,9 +330,9 @@ export const LoginApiAxiosParamCreator = function (configuration?: Configuration
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginLoginPost: async (discordToken: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+        login: async (discordToken: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
             // verify required parameter 'discordToken' is not null or undefined
-            assertParamExists('loginLoginPost', 'discordToken', discordToken)
+            assertParamExists('login', 'discordToken', discordToken)
             const localVarPath = `/login`;
             // use dummy base URL string because the URL constructor only accepts absolute URLs.
             const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
@@ -597,10 +377,10 @@ export const LoginApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async loginLoginPost(discordToken: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Token>> {
-            const localVarAxiosArgs = await localVarAxiosParamCreator.loginLoginPost(discordToken, options);
+        async login(discordToken: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Token>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.login(discordToken, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
-            const localVarOperationServerBasePath = operationServerMap['LoginApi.loginLoginPost']?.[localVarOperationServerIndex]?.url;
+            const localVarOperationServerBasePath = operationServerMap['LoginApi.login']?.[localVarOperationServerIndex]?.url;
             return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
         },
     }
@@ -620,8 +400,8 @@ export const LoginApiFactory = function (configuration?: Configuration, basePath
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        loginLoginPost(discordToken: string, options?: any): AxiosPromise<Token> {
-            return localVarFp.loginLoginPost(discordToken, options).then((request) => request(axios, basePath));
+        login(discordToken: string, options?: any): AxiosPromise<Token> {
+            return localVarFp.login(discordToken, options).then((request) => request(axios, basePath));
         },
     };
 };
@@ -641,8 +421,373 @@ export class LoginApi extends BaseAPI {
      * @throws {RequiredError}
      * @memberof LoginApi
      */
-    public loginLoginPost(discordToken: string, options?: RawAxiosRequestConfig) {
-        return LoginApiFp(this.configuration).loginLoginPost(discordToken, options).then((request) => request(this.axios, this.basePath));
+    public login(discordToken: string, options?: RawAxiosRequestConfig) {
+        return LoginApiFp(this.configuration).login(discordToken, options).then((request) => request(this.axios, this.basePath));
+    }
+}
+
+
+
+/**
+ * SoundsApi - axios parameter creator
+ * @export
+ */
+export const SoundsApiAxiosParamCreator = function (configuration?: Configuration) {
+    return {
+        /**
+         * 
+         * @summary Create Sound
+         * @param {string} guildId 
+         * @param {string} name 
+         * @param {File} file 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createSound: async (guildId: string, name: string, file: File, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'guildId' is not null or undefined
+            assertParamExists('createSound', 'guildId', guildId)
+            // verify required parameter 'name' is not null or undefined
+            assertParamExists('createSound', 'name', name)
+            // verify required parameter 'file' is not null or undefined
+            assertParamExists('createSound', 'file', file)
+            const localVarPath = `/sounds/create`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'POST', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+            const localVarFormParams = new ((configuration && configuration.formDataCtor) || FormData)();
+
+            if (guildId !== undefined) {
+                localVarQueryParameter['guild_id'] = guildId;
+            }
+
+            if (name !== undefined) {
+                localVarQueryParameter['name'] = name;
+            }
+
+
+            if (file !== undefined) { 
+                localVarFormParams.append('file', file as any);
+            }
+    
+    
+            localVarHeaderParameter['Content-Type'] = 'multipart/form-data';
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+            localVarRequestOptions.data = localVarFormParams;
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Delete Sound
+         * @param {string} soundName 
+         * @param {string} guildId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteSound: async (soundName: string, guildId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'soundName' is not null or undefined
+            assertParamExists('deleteSound', 'soundName', soundName)
+            // verify required parameter 'guildId' is not null or undefined
+            assertParamExists('deleteSound', 'guildId', guildId)
+            const localVarPath = `/sounds/{sound_name}`
+                .replace(`{${"sound_name"}}`, encodeURIComponent(String(soundName)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'DELETE', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (guildId !== undefined) {
+                localVarQueryParameter['guild_id'] = guildId;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary Get Sound
+         * @param {string} soundName 
+         * @param {string} guildId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getSound: async (soundName: string, guildId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'soundName' is not null or undefined
+            assertParamExists('getSound', 'soundName', soundName)
+            // verify required parameter 'guildId' is not null or undefined
+            assertParamExists('getSound', 'guildId', guildId)
+            const localVarPath = `/sounds/{sound_name}`
+                .replace(`{${"sound_name"}}`, encodeURIComponent(String(soundName)));
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (guildId !== undefined) {
+                localVarQueryParameter['guild_id'] = guildId;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+        /**
+         * 
+         * @summary List Sounds
+         * @param {string} guildId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listSounds: async (guildId: string, options: RawAxiosRequestConfig = {}): Promise<RequestArgs> => {
+            // verify required parameter 'guildId' is not null or undefined
+            assertParamExists('listSounds', 'guildId', guildId)
+            const localVarPath = `/sounds/list`;
+            // use dummy base URL string because the URL constructor only accepts absolute URLs.
+            const localVarUrlObj = new URL(localVarPath, DUMMY_BASE_URL);
+            let baseOptions;
+            if (configuration) {
+                baseOptions = configuration.baseOptions;
+            }
+
+            const localVarRequestOptions = { method: 'GET', ...baseOptions, ...options};
+            const localVarHeaderParameter = {} as any;
+            const localVarQueryParameter = {} as any;
+
+            if (guildId !== undefined) {
+                localVarQueryParameter['guild_id'] = guildId;
+            }
+
+
+    
+            setSearchParams(localVarUrlObj, localVarQueryParameter);
+            let headersFromBaseOptions = baseOptions && baseOptions.headers ? baseOptions.headers : {};
+            localVarRequestOptions.headers = {...localVarHeaderParameter, ...headersFromBaseOptions, ...options.headers};
+
+            return {
+                url: toPathString(localVarUrlObj),
+                options: localVarRequestOptions,
+            };
+        },
+    }
+};
+
+/**
+ * SoundsApi - functional programming interface
+ * @export
+ */
+export const SoundsApiFp = function(configuration?: Configuration) {
+    const localVarAxiosParamCreator = SoundsApiAxiosParamCreator(configuration)
+    return {
+        /**
+         * 
+         * @summary Create Sound
+         * @param {string} guildId 
+         * @param {string} name 
+         * @param {File} file 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async createSound(guildId: string, name: string, file: File, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<string>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.createSound(guildId, name, file, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SoundsApi.createSound']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Delete Sound
+         * @param {string} soundName 
+         * @param {string} guildId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async deleteSound(soundName: string, guildId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<boolean>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.deleteSound(soundName, guildId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SoundsApi.deleteSound']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary Get Sound
+         * @param {string} soundName 
+         * @param {string} guildId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async getSound(soundName: string, guildId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<any>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.getSound(soundName, guildId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SoundsApi.getSound']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+        /**
+         * 
+         * @summary List Sounds
+         * @param {string} guildId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        async listSounds(guildId: string, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<Array<string>>> {
+            const localVarAxiosArgs = await localVarAxiosParamCreator.listSounds(guildId, options);
+            const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
+            const localVarOperationServerBasePath = operationServerMap['SoundsApi.listSounds']?.[localVarOperationServerIndex]?.url;
+            return (axios, basePath) => createRequestFunction(localVarAxiosArgs, globalAxios, BASE_PATH, configuration)(axios, localVarOperationServerBasePath || basePath);
+        },
+    }
+};
+
+/**
+ * SoundsApi - factory interface
+ * @export
+ */
+export const SoundsApiFactory = function (configuration?: Configuration, basePath?: string, axios?: AxiosInstance) {
+    const localVarFp = SoundsApiFp(configuration)
+    return {
+        /**
+         * 
+         * @summary Create Sound
+         * @param {string} guildId 
+         * @param {string} name 
+         * @param {File} file 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        createSound(guildId: string, name: string, file: File, options?: any): AxiosPromise<string> {
+            return localVarFp.createSound(guildId, name, file, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Delete Sound
+         * @param {string} soundName 
+         * @param {string} guildId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        deleteSound(soundName: string, guildId: string, options?: any): AxiosPromise<boolean> {
+            return localVarFp.deleteSound(soundName, guildId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary Get Sound
+         * @param {string} soundName 
+         * @param {string} guildId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        getSound(soundName: string, guildId: string, options?: any): AxiosPromise<any> {
+            return localVarFp.getSound(soundName, guildId, options).then((request) => request(axios, basePath));
+        },
+        /**
+         * 
+         * @summary List Sounds
+         * @param {string} guildId 
+         * @param {*} [options] Override http request option.
+         * @throws {RequiredError}
+         */
+        listSounds(guildId: string, options?: any): AxiosPromise<Array<string>> {
+            return localVarFp.listSounds(guildId, options).then((request) => request(axios, basePath));
+        },
+    };
+};
+
+/**
+ * SoundsApi - object-oriented interface
+ * @export
+ * @class SoundsApi
+ * @extends {BaseAPI}
+ */
+export class SoundsApi extends BaseAPI {
+    /**
+     * 
+     * @summary Create Sound
+     * @param {string} guildId 
+     * @param {string} name 
+     * @param {File} file 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SoundsApi
+     */
+    public createSound(guildId: string, name: string, file: File, options?: RawAxiosRequestConfig) {
+        return SoundsApiFp(this.configuration).createSound(guildId, name, file, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Delete Sound
+     * @param {string} soundName 
+     * @param {string} guildId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SoundsApi
+     */
+    public deleteSound(soundName: string, guildId: string, options?: RawAxiosRequestConfig) {
+        return SoundsApiFp(this.configuration).deleteSound(soundName, guildId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary Get Sound
+     * @param {string} soundName 
+     * @param {string} guildId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SoundsApi
+     */
+    public getSound(soundName: string, guildId: string, options?: RawAxiosRequestConfig) {
+        return SoundsApiFp(this.configuration).getSound(soundName, guildId, options).then((request) => request(this.axios, this.basePath));
+    }
+
+    /**
+     * 
+     * @summary List Sounds
+     * @param {string} guildId 
+     * @param {*} [options] Override http request option.
+     * @throws {RequiredError}
+     * @memberof SoundsApi
+     */
+    public listSounds(guildId: string, options?: RawAxiosRequestConfig) {
+        return SoundsApiFp(this.configuration).listSounds(guildId, options).then((request) => request(this.axios, this.basePath));
     }
 }
 

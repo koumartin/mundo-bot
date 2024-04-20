@@ -5,8 +5,7 @@ import React, { useRef } from 'react'
 import { Session } from 'next-auth'
 import { OverlayPanel } from 'primereact/overlaypanel'
 import { Avatar } from 'primereact/avatar'
-import { auth } from '@/app/api/auth/[...nextauth]/auth'
-import { useSession } from 'next-auth/react'
+import { Button } from 'primereact/button'
 
 export interface ProfileSelectorProps {
   session: Session | null
@@ -15,12 +14,17 @@ export interface ProfileSelectorProps {
 const ProfileSelector = (props: ProfileSelectorProps) => {
   const { session } = props
   const panelRef = useRef<OverlayPanel>(null)
-  const { data } = useSession()
-  console.log('PS', data)
+
+  const renderPanel = () => (
+    <div>
+      {session?.user?.name}
+      <Button>Log out</Button>
+    </div>
+  )
 
   return (
     <>
-      <OverlayPanel ref={panelRef}>{session?.user?.name}</OverlayPanel>
+      <OverlayPanel ref={panelRef}>{renderPanel()}</OverlayPanel>
       <Avatar onClick={e => panelRef.current?.toggle(e)}>
         {session?.user?.image && (
           <Image

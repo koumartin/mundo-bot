@@ -1,17 +1,17 @@
-import { getServerSession } from 'next-auth'
-import { config } from '@/app/api/auth/[...nextauth]/auth'
-import { getSession } from 'next-auth/react'
-import { getToken } from 'next-auth/jwt'
+'use client'
 
-const Sounds = async () => {
-  const session = await getServerSession(config)
-  const s = await getSession()
+import { useCookies } from 'react-cookie'
+import { GuildCookie } from '@/components/GuildSelector'
 
+const Sounds = () => {
+  const [selectedGuild] = useCookies<'guild', GuildCookie>(['guild'])
+
+  console.log(selectedGuild)
+  if (!selectedGuild?.guild?.id) return <>Please select server</>
+  console.log('AAAA')
   return (
     <>
       <p>SOUNDS</p>
-      <p>{JSON.stringify(session, null, 2)}</p>
-      <p>{JSON.stringify(s, null, 2)}</p>
     </>
   )
 }

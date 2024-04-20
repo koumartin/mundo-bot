@@ -6,10 +6,11 @@ import { getServerSession } from 'next-auth'
 import { config } from '@/app/api/auth/[...nextauth]/auth'
 import { redirect } from 'next/navigation'
 import ProfileSelector from '@/components/ProfileSelector'
+import { ClientSessionProvider, SelectedGuildProvider } from '@/contexts'
 
 import './app.scss'
 import 'primereact/resources/themes/md-dark-indigo/theme.css'
-import ClientSessionProvider from '@/contexts/ClientSessionProvider'
+import { GuildSelector } from '@/components/GuildSelector'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -31,10 +32,11 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <ClientSessionProvider>
+        <ClientSessionProvider session={session}>
           <nav>
             <span>TODO: MUNDOBOT LOGO</span>
             <div style={{ flexGrow: 1 }} />
+            <GuildSelector />
             <ProfileSelector session={session} />
           </nav>
           <main>{children}</main>

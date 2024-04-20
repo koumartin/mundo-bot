@@ -24,7 +24,6 @@ export const config = {
       return true
     },
     jwt: async ({ account, token }) => {
-      console.log('Account', account)
       if (account && account.access_token) {
         // set access_token to the token payload
         token.accessToken = account.access_token
@@ -32,10 +31,12 @@ export const config = {
       return token
     },
     session: async ({ session, token }) => {
+      if (!token.accessToken) return session
+
       const api = new LoginApi(
-        new Configuration({ basePath: process.env.API_PATH })
+        new Configuration({ basePath: process.env.NEXT_PUBLIC_API_URL })
       )
-      const resp = await api.loginLoginPost(token.accessToken)
+      const resp = await api.login(token.accessToken)
 
       return { ...session, accessToken: resp.data.access_token }
     },
