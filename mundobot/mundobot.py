@@ -50,12 +50,12 @@ class MundoBot(commands.Bot):
         client (MongoClient): Client for accessing used mongodb.
     """
 
-    def __init__(self, token: str, mongodbConnectionString: str) -> None:
+    def __init__(self, token: str, mongodb_connection_string: str) -> None:
         """Initializes the bot by creating connections to db and preparing token.
 
         Args:
             token (str): Discord api bot token.
-            mongodbConnectionString (str): Connection string to mongodb.
+            mongodb_connection_string (str): Connection string to mongodb.
         """
         intents: dc.Intents = dc.Intents.default()
         intents.members = True  # pylint: disable=assigning-non-slot
@@ -66,7 +66,7 @@ class MundoBot(commands.Bot):
         self.path = os.path.dirname(os.path.abspath(__file__))
 
         self.client = MongoClient(
-            mongodbConnectionString,
+            mongodb_connection_string,
             uuidRepresentation="standard",
             tlsCAFile=certifi.where(),
         )
@@ -394,9 +394,11 @@ class MundoBot(commands.Bot):
                 ctx.guild,
             )
 
+            default_sounds, guild_sounds = self.playback_manager.list_sounds_for_guild(ctx.guild.id)
             await ctx.channel.send(
                 "Dostupné zvuky: \n"
-                + self.playback_manager.list_sounds_for_guild(ctx.guild.id)
+                + "Základní zvuky: " + ", ".join(default_sounds) + "\n"
+                + "Vlastní zvuky: " + ", ".join()
             )
 
         # -----------------------------------------------------

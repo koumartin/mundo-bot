@@ -19,10 +19,6 @@ export const config = {
   ],
   session: { strategy: 'jwt' },
   callbacks: {
-    signIn: async params => {
-      console.log('Signin', params)
-      return true
-    },
     jwt: async ({ account, token }) => {
       if (account && account.access_token) {
         // set access_token to the token payload

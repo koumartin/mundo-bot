@@ -9,6 +9,7 @@ from fastapi.routing import APIRoute
 from mundobot.mundobot import MundoBot
 from .api_login import LoginRouter, get_current_user_depends
 from .api_sounds import SoundsRouter
+from .dependencies import get_selected_guild_depends
 from .dtos.GuildDto import GuildDto
 
 origins = [
@@ -46,8 +47,10 @@ class MundoBotApi:
 
     def add_endpoints(self):
         @self.app.get("/")
-        async def root(user: get_current_user_depends) -> str:
-            return "Hello, world." + user.discord_user_id
+        async def root(user: get_current_user_depends, guild_id: get_selected_guild_depends) -> str:
+            return f"""Hello, world.
+Your id: {user.discord_user_id}
+In guild with id: {guild_id}"""
 
         @self.app.get('/available-guilds', tags=['guilds'])
         async def available_guilds(user: get_current_user_depends) -> List[GuildDto]:

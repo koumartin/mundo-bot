@@ -1,0 +1,19 @@
+.guildSelector {
+  margin-right: 15px;
+  width: 300px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 3px;
+
+
+  :global(.p-dropdown) {
+    background: var(--secondary);
+    height: 40px;
+    border-width: 0;
+
+    span {
+      align-self: center;
+    }
+  }
+}

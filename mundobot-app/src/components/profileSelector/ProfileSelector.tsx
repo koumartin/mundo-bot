@@ -6,6 +6,7 @@ import { Session } from 'next-auth'
 import { OverlayPanel } from 'primereact/overlaypanel'
 import { Avatar } from 'primereact/avatar'
 import { Button } from 'primereact/button'
+import { signOut } from 'next-auth/react'
 
 export interface ProfileSelectorProps {
   session: Session | null
@@ -15,10 +16,14 @@ const ProfileSelector = (props: ProfileSelectorProps) => {
   const { session } = props
   const panelRef = useRef<OverlayPanel>(null)
 
+  const handleLogout = async () => {
+    await signOut()
+  }
+
   const renderPanel = () => (
-    <div>
-      {session?.user?.name}
-      <Button>Log out</Button>
+    <div style={{ display: 'flex', flexFlow: 'column' }}>
+      <span>{session?.user?.name}</span>
+      <Button onClick={handleLogout}>Log out</Button>
     </div>
   )
 
@@ -30,8 +35,9 @@ const ProfileSelector = (props: ProfileSelectorProps) => {
           <Image
             src={session.user.image}
             alt={'profile-picture'}
-            width={35}
-            height={35}
+            width={40}
+            height={40}
+            priority={true}
           />
         )}
       </Avatar>

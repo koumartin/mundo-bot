@@ -1,0 +1,39 @@
+.sound {
+  display: flex;
+  width: 70%;
+  height: 3.5rem;
+  border: 2px solid black;
+  border-radius: 15px;
+  align-items: center;
+  background-color: var(--primary);
+
+  .name {
+    margin: 0.5rem 0 0.5rem 0.5rem;
+    padding: 0.5rem;
+    width: 25%;
+    background-color: var(--secondary);
+  }
+
+  .duration {
+    margin-right: 0.5rem;
+  }
+
+   :global(.p-progressbar-determinate) :global(.p-progressbar-value-animate) {
+     transition: width 0.01s linear;
+   }
+
+  .soundBar {
+    flex-grow: 1;
+    height: 0.6rem;
+    margin-right: 3px;
+    border-radius: 0.1rem;
+    background: var(--primary);
+
+    .active {
+      background: var(--secondary);
+      border-radius: 0.25rem;
+      height: 100%;
+      transition: width 0.1s linear;
+    }
+  }
+}

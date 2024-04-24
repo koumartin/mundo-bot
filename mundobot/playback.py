@@ -4,12 +4,13 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 from queue import Queue
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 import discord as dc
 import requests
 from bson.binary import Binary
 from pymongo import MongoClient
+from pymongo.collection import Collection
 
 
 @dataclass
@@ -42,8 +43,8 @@ class PlaybackManager:
         self, client: MongoClient, path: str, voice_clients: List[dc.VoiceClient]
     ) -> None:
         self.client = client
-        self.sounds = client.bot.sounds
-        self.sounds_data = client.bot.sounds_data
+        self.sounds: Collection = client.bot.sounds
+        self.sounds_data: Collection = client.bot.sounds_data
         self.voice_clients = voice_clients
         self.path = path
         self.playback_queue: Dict[int, Queue[PlaybackItem]] = {}
@@ -145,6 +146,8 @@ class PlaybackManager:
         """Plays a sound specified by file_name in a VoiceClient.
 
         Args:
+            guild_id:
+            sound_name:
             voice_client (dc.VoiceClient): Voice client to play the sound.
             file_name (str): Name of the sound file.
         """
@@ -200,8 +203,7 @@ class PlaybackManager:
         Args:
             sound_name (str): Name of the sound.
             guild_id (int): Id of the guild.
-            transfer (bool): Flag to indicat if the sound should be
-            loaded from database if not found. Defaults to True.
+            transfer (bool): Flag to indicate if the sound should be loaded from database if not found. Defaults to True.
 
         Returns:
             Path: File path of the sound.
@@ -296,16 +298,17 @@ class PlaybackManager:
         if sound_path is not None:
             sound_path.unlink()
 
-    def list_sounds_for_guild(self, guild_id: int) -> str:
+    def list_sounds_for_guild(self, guild_id: int) -> Tuple[List[str], List[str]]:
         """Lists all sounds available for a server.
 
         Args:
             guild_id (int): Id of the guild.
 
         Returns:
-            str: String containing names of all available sound names.
+            default_sounds (List[str]): List of names of all default sounds.
+            guild_sounds (List[str]): List of names of all guild specific sounds.
         """
         sound_names = [
             info["name"] for info in self.sounds_data.find({"guild_id": guild_id})
         ]
-        return "\n".join(["  ".join(DISPLAYED_COMMON_SOUNDS), "  ".join(sound_names)])
+        return DISPLAYED_COMMON_SOUNDS, sound_names

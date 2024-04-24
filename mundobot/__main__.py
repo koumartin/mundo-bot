@@ -28,12 +28,11 @@ if mongodb == "Docker":
             f"mongodb://{quote_plus(username)}:{quote_plus(password)}@mongodb:27017"
         )
 elif mongodb == "External":
-    connection_string = os.environ.get("MONGODB_CONNECTION_STRING")
+    connection_string = os.environ.get("MONGO_CONNECTION_STRING")
 else:
     connection_string = (
         f"mongodb://{quote_plus(username)}:{quote_plus(password)}@localhost:27017"
     )
-
 bot = MundoBot(bot_token, connection_string)
 run_api = bool(os.environ.get('RUN_API', 'False'))
 

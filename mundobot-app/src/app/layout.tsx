@@ -5,12 +5,10 @@ import React from 'react'
 import { getServerSession } from 'next-auth'
 import { config } from '@/app/api/auth/[...nextauth]/auth'
 import { redirect } from 'next/navigation'
-import ProfileSelector from '@/components/ProfileSelector'
-import { ClientSessionProvider, SelectedGuildProvider } from '@/contexts'
+import { ClientSessionProvider } from '@/contexts'
+import { GuildSelector, ProfileSelector } from '@/components'
 
-import './app.scss'
-import 'primereact/resources/themes/md-dark-indigo/theme.css'
-import { GuildSelector } from '@/components/GuildSelector'
+import { Menubar } from 'primereact/menubar'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -28,14 +26,22 @@ export default async function RootLayout({
   if (!session) {
     redirect('/api/auth/signin')
   }
-
+  // TODO: Axios interceptors
   return (
     <html lang="en">
       <body className={inter.className}>
         <ClientSessionProvider session={session}>
           <nav>
-            <span>TODO: MUNDOBOT LOGO</span>
-            <div style={{ flexGrow: 1 }} />
+            <span
+              style={{
+                background: 'var(--secondary)',
+                width: '200px',
+                height: '100%',
+              }}
+            >
+              LOGO
+            </span>
+            <Menubar className={'menu-bar'} />
             <GuildSelector />
             <ProfileSelector session={session} />
           </nav>
