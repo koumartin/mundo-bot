@@ -57,6 +57,7 @@ const Sounds = () => {
         onHide={() => setDialogVisible(false)}
         visible={dialogVisible}
         onUpload={newSound => setSounds(prev => [...prev, newSound])}
+        existingNames={sounds.map(x => x.name)}
       />
       <div className={styles.header}>
         <span>

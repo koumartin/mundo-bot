@@ -1,6 +1,6 @@
 .dialog {
   width: 80vw;
-  height: 75vh;
+  height: 77vh;
 }
 
 .panel {
@@ -17,6 +17,10 @@
     flex-direction: row;
     align-items: center;
     gap: 1rem;
+  }
+
+  .errorMessage {
+    margin-left: 3px;
   }
 }
 
@@ -59,7 +63,7 @@
       display: inline-flex;
 
       position: absolute;
-      top: 23%;
+      top: 20%;
       right: var(--right-offset);
 
       flex-direction: column;
@@ -72,6 +76,7 @@
         background-color: red;
         opacity: 1;
         transition: opacity 0.5s;
+        width: 200px;
       }
 
       .musicIcon {
@@ -230,6 +235,11 @@
       flex-direction: column;
       gap: 0;
       align-items: flex-start;
+    }
+
+    .errorMessage {
+      margin-top: 3px;
+      margin-left: 0;
     }
   }
 }

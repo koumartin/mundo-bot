@@ -8,24 +8,27 @@ import {
 
 import styles from './soundUploadDialog.module.scss'
 import { useApi } from '@/api/useApi'
-import { ChangeEvent, useRef, useState } from 'react'
+import { ChangeEvent, useCallback, useRef, useState } from 'react'
 import { SoundDto } from '@/api'
 import { Button } from 'primereact/button'
 import SoundUploadAnimation from './SoundUploadAnimation'
+import { Message } from 'primereact/message'
 
 interface SoundUploadDialogProps extends DialogProps {
   onUpload: (newSound: SoundDto) => void
+  existingNames: string[]
 }
 
 const DEFAULT_NAME_INPUT_VALUE = { value: '', valid: true }
 
 const SoundUploadDialog = (props: SoundUploadDialogProps) => {
-  const { visible, onHide, onUpload } = props
+  const { visible, onHide, onUpload, existingNames } = props
   const { soundsApi } = useApi()
   const [nameInput, setNameInput] = useState<{ value: string; valid: boolean }>(
     DEFAULT_NAME_INPUT_VALUE
   )
   const [uploaded, setUploaded] = useState(false)
+  const [errorText, setErrorText] = useState('')
 
   const uploadRef = useRef<FileUpload>(null)
 
@@ -57,7 +60,18 @@ const SoundUploadDialog = (props: SoundUploadDialogProps) => {
 
   const isNameValid = (value?: string) => {
     value ??= nameInput.value
-    return value.length > 0 && value.length < 30
+    if (value.length === 0) {
+      setErrorText('Name is required')
+      return false
+    } else if (value.length > 30) {
+      setErrorText('Name is too long')
+      return false
+    } else if (existingNames.some(x => x === value)) {
+      setErrorText('Name used already')
+      return false
+    }
+    setErrorText('')
+    return true
   }
 
   const handleUpload = async (e: FileUploadHandlerEvent) => {
@@ -80,16 +94,18 @@ const SoundUploadDialog = (props: SoundUploadDialogProps) => {
     })
   }
 
+  const handlePlayingFinished = useCallback(() => {
+    setUploaded(false)
+    uploadRef.current?.clear()
+    onHide()
+  }, [onHide])
+
   const itemTemplate = (file: object) => {
     return (
       <SoundUploadAnimation
         file={file as File}
         playing={uploaded}
-        onPlayingFinished={() => {
-          setUploaded(false)
-          uploadRef.current?.clear()
-          onHide()
-        }}
+        onPlayingFinished={handlePlayingFinished}
       />
     )
   }
@@ -109,6 +125,13 @@ const SoundUploadDialog = (props: SoundUploadDialogProps) => {
             autoFocus
             invalid={!nameInput.valid}
           />
+          {errorText && (
+            <Message
+              className={styles.errorMessage}
+              severity={'error'}
+              text={errorText}
+            />
+          )}
         </span>
         <FileUpload
           ref={uploadRef}
@@ -128,7 +151,12 @@ const SoundUploadDialog = (props: SoundUploadDialogProps) => {
   return (
     <Dialog
       visible={visible}
-      onHide={onHide}
+      onHide={() => {
+        setNameInput(DEFAULT_NAME_INPUT_VALUE)
+        setErrorText('')
+        uploadRef.current?.clear()
+        onHide()
+      }}
       className={styles.dialog}
       header={'Upload new sound'}
     >

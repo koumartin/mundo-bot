@@ -34,26 +34,25 @@ const SoundUploadAnimation = (props: SoundUploadedAnimationProps) => {
     if (started) return
 
     const audioUrl = URL.createObjectURL(file)
-    const audio = new Audio(audioUrl)
-    audio.onended = onMusicFinished
-    audio.onprogress = () => {
-      if (audio.currentTime > 5) {
-        audio.pause()
-        onMusicFinished()
-      }
-    }
-    setAudio(audio)
-  }, [file, onMusicFinished, onPlayingFinished, started])
+    const newAudio = new Audio(audioUrl)
+    newAudio.onended = onMusicFinished
+    setAudio(newAudio)
+  }, [file, onMusicFinished, started])
 
   useEffect(() => {
     if (started || !playing) return
     else setStarted(true)
 
+    // Start and then finish the audio preview
     setTimeout(() => {
-      console.log(audio)
-      audio?.play().then()
+      audio?.play().then(() =>
+        setTimeout(() => {
+          audio?.pause()
+          onMusicFinished()
+        }, 5000)
+      )
     }, 5000)
-  }, [audio, playing, started])
+  }, [audio, onMusicFinished, playing, started])
 
   return (
     <div
