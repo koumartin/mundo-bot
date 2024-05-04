@@ -1,19 +1,30 @@
 .guildSelector {
   margin-right: 15px;
-  width: 300px;
   display: flex;
   justify-content: center;
   align-items: center;
   gap: 3px;
 
+  & > span {
+    width: 70px;
+    text-align: center;
+  }
 
   :global(.p-dropdown) {
-    background: var(--secondary);
+    background: var(--primary-800);
     height: 40px;
     border-width: 0;
 
     span {
       align-self: center;
+    }
+  }
+}
+
+@media screen and (min-width: 960px) {
+  .guildSelector {
+    span {
+      width: unset;
     }
   }
 }

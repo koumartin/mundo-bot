@@ -36,13 +36,13 @@ class SoundsRouter:
             return FileResponse(file_path, media_type='audio/mp3', filename=name)
 
         @self.router.post('/create')
-        async def create_sound(name: str, file: UploadFile, guild_id: get_selected_guild_depends) -> str:
+        async def create_sound(name: str, file: UploadFile, guild_id: get_selected_guild_depends) -> SoundDto:
             if file.size > MAX_LENGTH:
                 raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail='File too large')
 
-            self.bot.playback_manager.save_to_local_cache(name, guild_id, file.read())
-            self.bot.playback_manager.save_to_database(name, guild_id, file.read())
-            return name
+            self.bot.playback_manager.save_to_local_cache(name, guild_id, await file.read())
+            self.bot.playback_manager.save_to_database(name, guild_id, await file.read())
+            return SoundDto(name=name, default=False)
 
         @self.router.delete('/{name}')
         async def delete_sound(name: str, guild_id: get_selected_guild_depends) -> None:

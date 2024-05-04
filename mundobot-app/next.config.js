@@ -3,8 +3,11 @@ import findConfig from 'find-config'
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  redirects: async () => [
+    { source: '/sounds', destination: '/sounds/manage', permanent: true },
+  ],
   images: {
-    unoptimized: true, // Only because of bun
+    // unoptimized: true, // Only because of bun
     remotePatterns: [
       {
         protocol: 'https',

@@ -1,0 +1,19 @@
+.header {
+  font-size: 1.2em;
+  display: flex;
+  justify-content: space-between;
+}
+
+.soundsList {
+  margin: 0.5rem;
+  display: grid;
+  align-content: start;
+  height: 80vh;
+  grid-gap: 0.5rem 0.75rem;
+}
+
+@media screen and (min-width: 960px){
+  .soundsList {
+      grid-template-columns: 1fr 1fr;
+  }
+}

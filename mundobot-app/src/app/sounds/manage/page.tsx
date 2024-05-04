@@ -13,6 +13,7 @@ import styles from './sounds.module.scss'
 import { Button } from 'primereact/button'
 import { SoundUploadDialog } from '@/components/dialogs'
 import { SoundDto } from '@/api'
+import Loading from '@/components/loading/Loading'
 
 const Sounds = () => {
   const [selectedGuild] = useCookies<'guild', GuildCookie>(['guild'])
@@ -22,6 +23,11 @@ const Sounds = () => {
   const [dialogVisible, setDialogVisible] = useState<boolean>(false)
 
   const { soundsApi } = useApi()
+
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     // This has to be done to allow for hydration of this component (can't depend on browser features during initial render)
@@ -40,6 +46,8 @@ const Sounds = () => {
     [soundsApi]
   )
 
+  if (!mounted) return <Loading />
+
   if (!selectedGuildValue)
     return <p className={styles.aaaa}>Please select server</p>
 
@@ -48,6 +56,7 @@ const Sounds = () => {
       <SoundUploadDialog
         onHide={() => setDialogVisible(false)}
         visible={dialogVisible}
+        onUpload={newSound => setSounds(prev => [...prev, newSound])}
       />
       <div className={styles.header}>
         <span>

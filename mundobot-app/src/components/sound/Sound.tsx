@@ -46,7 +46,8 @@ const Sound = (props: SoundProps) => {
   const handlePlay = async () => {
     // Already have all data and player is visible
     if (audioState.src && audioState.showing) {
-      await audioRef.current?.play()
+      if (audioState.playing) audioRef.current?.pause()
+      else await audioRef.current?.play()
       return
     }
     // Data was downloaded through download button, only show player
@@ -110,8 +111,13 @@ const Sound = (props: SoundProps) => {
 
   return (
     <div className={styles.sound}>
-      <p className={styles.name}>{name}</p>
-      <Button icon={'pi pi-play'} onClick={handlePlay} rounded text />
+      <span className={styles.name}>{name}</span>
+      <Button
+        icon={audioState.playing ? 'pi pi-pause' : 'pi pi-play'}
+        onClick={handlePlay}
+        rounded
+        text
+      />
       {audioState.src && audioState.showing && (
         <>
           <audio
@@ -120,14 +126,20 @@ const Sound = (props: SoundProps) => {
             onPlay={() =>
               setAudioState(prevState => ({ ...prevState, playing: true }))
             }
-            onPause={() =>
+            onPause={() => {
               setAudioState(prevState => ({
                 ...prevState,
                 playing: false,
-                currentTime:
-                  (prevState?.currentTime ?? 0) > 0 ? prevState.duration : 0,
+                currentTime: audioRef.current?.currentTime,
               }))
-            }
+            }}
+            onEnded={() => {
+              setAudioState(prevState => ({
+                ...prevState,
+                playing: false,
+                currentTime: prevState.duration,
+              }))
+            }}
             onLoadedMetadata={(e: SyntheticEvent<HTMLAudioElement>) => {
               const duration = e.currentTarget?.duration
               setAudioState(prev => ({
@@ -140,8 +152,10 @@ const Sound = (props: SoundProps) => {
             duration={audioState.duration}
             currentTime={audioState.currentTime}
             onTimeChange={newTime => {
-              !audioState.playing &&
+              if (!audioState.playing) {
                 setAudioState(prev => ({ ...prev, currentTime: newTime }))
+                if (audioRef.current) audioRef.current.currentTime = newTime
+              }
             }}
           />
           {renderDuration()}
@@ -150,7 +164,7 @@ const Sound = (props: SoundProps) => {
       {!audioState.showing && <div style={{ flexGrow: 1 }} />}
       {!def && (
         <Button
-          icon={'pi pi-cross'}
+          icon={'pi pi-times'}
           onClick={() => onDelete(name)}
           rounded
           text

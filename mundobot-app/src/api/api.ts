@@ -617,7 +617,7 @@ export const SoundsApiFp = function(configuration?: Configuration) {
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        async createSound(name: string, file: File, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<string>> {
+        async createSound(name: string, file: File, options?: RawAxiosRequestConfig): Promise<(axios?: AxiosInstance, basePath?: string) => AxiosPromise<SoundDto>> {
             const localVarAxiosArgs = await localVarAxiosParamCreator.createSound(name, file, options);
             const localVarOperationServerIndex = configuration?.serverIndex ?? 0;
             const localVarOperationServerBasePath = operationServerMap['SoundsApi.createSound']?.[localVarOperationServerIndex]?.url;
@@ -679,7 +679,7 @@ export const SoundsApiFactory = function (configuration?: Configuration, basePat
          * @param {*} [options] Override http request option.
          * @throws {RequiredError}
          */
-        createSound(name: string, file: File, options?: any): AxiosPromise<string> {
+        createSound(name: string, file: File, options?: any): AxiosPromise<SoundDto> {
             return localVarFp.createSound(name, file, options).then((request) => request(axios, basePath));
         },
         /**
