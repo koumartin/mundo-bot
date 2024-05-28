@@ -6,7 +6,7 @@ from collections import namedtuple
 import os
 import logging
 import signal
-from datetime import datetime, timedelta
+from datetime import datetime
 import sys
 import traceback
 from typing import Iterable, List, Optional
@@ -20,10 +20,10 @@ from discord.ext.commands.context import Context
 from pymongo import MongoClient
 import schedule
 
-from mundobot.clash import Clash
-from mundobot.clash_api_service import ApiClash, ClashApiService
-from mundobot.clashmanager import ClashManager
-from mundobot.position import Position
+from mundobot.clash.clash import Clash
+from mundobot.clash.clash_api_service import ApiClash, ClashApiService
+from mundobot.clash.clashmanager import ClashManager
+from mundobot.clash.position import Position
 from mundobot.playback import PlaybackManager
 from mundobot import helpers
 
@@ -50,12 +50,12 @@ class MundoBot(commands.Bot):
         client (MongoClient): Client for accessing used mongodb.
     """
 
-    def __init__(self, token: str, mongodbConnectionString: str) -> None:
+    def __init__(self, token: str, mongodb_connection_string: str) -> None:
         """Initializes the bot by creating connections to db and preparing token.
 
         Args:
             token (str): Discord api bot token.
-            mongodbConnectionString (str): Connection string to mongodb.
+            mongodb_connection_string (str): Connection string to mongodb.
         """
         intents: dc.Intents = dc.Intents.default()
         intents.members = True  # pylint: disable=assigning-non-slot
@@ -66,7 +66,7 @@ class MundoBot(commands.Bot):
         self.path = os.path.dirname(os.path.abspath(__file__))
 
         self.client = MongoClient(
-            mongodbConnectionString,
+            mongodb_connection_string,
             uuidRepresentation="standard",
             tlsCAFile=certifi.where(),
         )
@@ -89,8 +89,13 @@ class MundoBot(commands.Bot):
         )
         self.add_all_commands()
 
-    def start_running(self) -> None:
+    async def start_running(self) -> None:
         """Commands the bot to log in and start running using its api token."""
+        await self.start(self.token)
+
+        # self.run(self.token)
+
+    def start_running_managed(self):
         self.run(self.token)
 
     def add_all_commands(self) -> None:
@@ -389,9 +394,11 @@ class MundoBot(commands.Bot):
                 ctx.guild,
             )
 
+            default_sounds, guild_sounds = self.playback_manager.list_sounds_for_guild(ctx.guild.id)
             await ctx.channel.send(
                 "Dostupné zvuky: \n"
-                + self.playback_manager.list_sounds_for_guild(ctx.guild.id)
+                + "Základní zvuky: " + ", ".join(default_sounds) + "\n"
+                + "Vlastní zvuky: " + ", ".join()
             )
 
         # -----------------------------------------------------

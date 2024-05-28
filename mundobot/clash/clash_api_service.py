@@ -16,7 +16,7 @@ class ClashApiService:
     def __init__(self, api_key: str = "") -> None:
         api_key: str
         if not api_key:
-            self.api_key = os.environ.get("riotApiKey")
+            self.api_key = os.environ.get("RIOT_API_KEY")
         else:
             self.api_key = api_key
         self.lol_watcher_clash = LolWatcher(api_key=self.api_key).clash
