@@ -58,7 +58,7 @@ In guild with id: {guild_id}"""
 
 
 def start_server(app: FastAPI, loop: asyncio.AbstractEventLoop):
-    config = uvicorn.Config(app, loop=loop)
+    config = uvicorn.Config(app, loop=loop, host='0.0.0.0')
     server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())
 
