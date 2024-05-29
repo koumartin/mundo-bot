@@ -13,9 +13,12 @@ from .api_sounds import SoundsRouter
 from .dependencies import get_selected_guild_depends
 from .dtos.GuildDto import GuildDto
 
-origins = [
-    "http://localhost:3000",
-] + os.environ.get('API_ORIGINS').split(',')
+
+def get_origins() -> List[str]:
+    origins = [
+        "http://localhost:3000",
+    ] + os.environ.get('API_ORIGINS').split(',')
+    return origins
 
 
 def use_route_names_as_operation_ids(application: FastAPI) -> None:
@@ -35,7 +38,7 @@ class MundoBotApi:
     def __init__(self, bot: MundoBot):
         self.bot = bot
         self.app = FastAPI()
-        self.app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+        self.app.add_middleware(CORSMiddleware, allow_origins=get_origins(), allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
         self.app_login = LoginRouter()
         self.app.include_router(self.app_login.router)
