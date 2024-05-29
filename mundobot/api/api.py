@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import List
 
 from fastapi import FastAPI
@@ -14,7 +15,7 @@ from .dtos.GuildDto import GuildDto
 
 origins = [
     "http://localhost:3000",
-]
+] + os.environ.get('API_ORIGINS').split(',')
 
 
 def use_route_names_as_operation_ids(application: FastAPI) -> None:
