@@ -3,7 +3,7 @@
 import { useCallback, useMemo, useState } from 'react'
 import { Menubar } from 'primereact/menubar'
 import { MenuItem, MenuItemCommandEvent } from 'primereact/menuitem'
-import { usePathname, useRouter } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import MusicIcon from '@/icons/MusicIcon'
 import useLayout from '@/hooks/useLayout'
 import { BurgerIcon } from '@/icons/BurgerIcon'
