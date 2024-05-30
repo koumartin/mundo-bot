@@ -7,9 +7,6 @@ import { redirect } from 'next/navigation'
 import { ClientSessionProvider } from '@/contexts'
 import { GuildSelector, NavBar, ProfileSelector } from '@/components'
 
-import Image from 'next/image'
-import Link from 'next/link'
-
 import '@/styles/globals.scss'
 
 const inter = Inter({ subsets: ['latin'] })
