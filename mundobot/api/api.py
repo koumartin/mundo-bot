@@ -1,4 +1,5 @@
 import asyncio
+import os
 from typing import List
 
 from fastapi import FastAPI
@@ -12,9 +13,12 @@ from .api_sounds import SoundsRouter
 from .dependencies import get_selected_guild_depends
 from .dtos.GuildDto import GuildDto
 
-origins = [
-    "http://localhost:3000",
-]
+
+def get_origins() -> List[str]:
+    origins = [
+        "http://localhost:3000",
+    ] + os.environ.get('API_ORIGINS').split(',')
+    return origins
 
 
 def use_route_names_as_operation_ids(application: FastAPI) -> None:
@@ -34,7 +38,7 @@ class MundoBotApi:
     def __init__(self, bot: MundoBot):
         self.bot = bot
         self.app = FastAPI()
-        self.app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
+        self.app.add_middleware(CORSMiddleware, allow_origins=get_origins(), allow_credentials=True, allow_methods=["*"], allow_headers=["*"])
 
         self.app_login = LoginRouter()
         self.app.include_router(self.app_login.router)
@@ -54,11 +58,11 @@ In guild with id: {guild_id}"""
 
         @self.app.get('/available-guilds', tags=['guilds'])
         async def available_guilds(user: get_current_user_depends) -> List[GuildDto]:
-            return [GuildDto(id=guild.id, name=guild.name) for guild in self.bot.guilds if guild.get_member(user.discord_user_id) is not None]
+            return [GuildDto(id=str(guild.id), name=guild.name) for guild in self.bot.guilds if guild.get_member(user.discord_user_id) is not None]
 
 
 def start_server(app: FastAPI, loop: asyncio.AbstractEventLoop):
-    config = uvicorn.Config(app, loop=loop)
+    config = uvicorn.Config(app, loop=loop, host='0.0.0.0')
     server = uvicorn.Server(config)
     loop.run_until_complete(server.serve())
 

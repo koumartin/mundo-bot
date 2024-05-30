@@ -31,10 +31,10 @@ import { BASE_PATH, COLLECTION_FORMATS, BaseAPI, RequiredError, operationServerM
 export interface GuildDto {
     /**
      * 
-     * @type {number}
+     * @type {string}
      * @memberof GuildDto
      */
-    'id': number;
+    'id': string;
     /**
      * 
      * @type {string}

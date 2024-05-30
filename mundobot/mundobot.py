@@ -59,6 +59,7 @@ class MundoBot(commands.Bot):
         """
         intents: dc.Intents = dc.Intents.default()
         intents.members = True  # pylint: disable=assigning-non-slot
+        intents.message_content = True
 
         commands.Bot.__init__(self, command_prefix="!", intents=intents)
         
@@ -282,7 +283,7 @@ class MundoBot(commands.Bot):
                 voice_channel = None
 
             if voice_channel is not None:
-                await self.playback_manager.add_to_queue(ctx.guild, voice_channel, num)
+                await self.playback_manager.add_to_queue(ctx.guild, voice_channel, "mundo", num)
             else:
                 await ctx.author.send("Mundo can't greet without voice channel.")
 
@@ -398,7 +399,7 @@ class MundoBot(commands.Bot):
             await ctx.channel.send(
                 "Dostupné zvuky: \n"
                 + "Základní zvuky: " + ", ".join(default_sounds) + "\n"
-                + "Vlastní zvuky: " + ", ".join()
+                + "Vlastní zvuky: " + ", ".join(guild_sounds)
             )
 
         # -----------------------------------------------------

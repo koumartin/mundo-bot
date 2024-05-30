@@ -2,5 +2,5 @@ from pydantic import BaseModel
 
 
 class GuildDto(BaseModel):
-    id: int
+    id: str
     name: str

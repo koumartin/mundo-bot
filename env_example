@@ -8,8 +8,10 @@ MONGO_CONNECTION_STRING=<connection string to external database>
 
 RUN_API=<True / False>
 API_JWT_SECRET_KEY=<Key used for JWT validation. Anything secret.>
+API_ORIGINS=<comma separated list of origins that have CORS enabled>
 
 APP_DISCORD_ID=<Id of app in discord developer portal>
 APP_DISCORD_SECRET=<Secret of app in discord developer portal>
+NEXTAUTH_URL=<url of the application in the server>
 NEXTAUTH_SECRET='secret'
-API_URL=''
+API_URL=<url of the api endpoints root>

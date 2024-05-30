@@ -7,9 +7,6 @@ import { redirect } from 'next/navigation'
 import { ClientSessionProvider } from '@/contexts'
 import { GuildSelector, NavBar, ProfileSelector } from '@/components'
 
-import Image from 'next/image'
-import Link from 'next/link'
-
 import '@/styles/globals.scss'
 
 const inter = Inter({ subsets: ['latin'] })
@@ -34,9 +31,6 @@ export default async function RootLayout({
       <body className={inter.className}>
         <ClientSessionProvider session={session}>
           <nav>
-            <Link href={'/'} style={{ marginTop: '3px' }}>
-              <Image src={'/logo.png'} alt={'LOGO'} width={200} height={50} />
-            </Link>
             <NavBar className={'menu-bar'} />
             <GuildSelector />
             <ProfileSelector session={session} />
