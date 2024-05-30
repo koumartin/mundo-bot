@@ -4,6 +4,13 @@ nahrávat vlastní zvuky uživatelům bota. Předcchozí možnost zahrnující p
 ukládání z něj se ukázala velmi nepraktická. Hlavním účelem aplikace je tedy zobrazovat, přehrávat, stahovat, přidávat a 
 odstraňovat zvukové soubory. Ty jsou pro každý server na kterém je bot přítomný jiné (tedy až na malé množství defaultich zvuků).
 
+## Použití
+Aplikace aktuálně běží na mém serveru na adrese `http://185.186.65.20:3000` přičemž http API běží na `http://185.186.65.20:8000`. 
+Pro přihlášení je možné použít můj testovací discord účet - údaje v odevzdávacím formuláři. Po přihlášení je možné vidět celou aplikaci, 
+vybrat server a přejít do záložky Sounds > Manage. Tam je možné vidět všechny dostupné zvuky a spravovat je. Add lze použít na otevření 
+dialogu k přidání nového zvuku. Všechny zvuky se ukádají do MongoDb a jsou dostupné okamžitě i discord botovi. K tomu stačí do libovolného
+kanálu na zvoleném serveru napsat `!list_sounds` k zobrazení dostupných zvuků, popřípadě `play_sound {název} {počet=1}` k přehrání.
+
 ## Scháma fungování
 Jednotlivá bloky aplikace fungují podle následujícího schámatu:  
 ![diagram](diagram.png)
@@ -21,7 +28,7 @@ Jednotlivá bloky aplikace fungují podle následujícího schámatu:
 |Offline|x|1|Kontrola připojení a případné zobrazení hlášky, když by se měl odeslat request|
 |Pokročilé selektory|x|1||
 |Vendor|x|1|Automaticky - PostCSS v Next.js|
-|CSS transformace|?|2||
+|CSS transformace|x|2|Součástí animace|
 |CSS transition/animace|x|2|Přehrávání zvuku, animace po nahrání zvuku|
 |Media queries|x|2|Změna při přechodu pod 960px|
 |OOP|x|2|React od OOP ustoupil, proto není nikde použito|
@@ -30,3 +37,10 @@ Jednotlivá bloky aplikace fungují podle následujícího schámatu:
 |Historie|x|2|Vyplývá z použití Next.js routingu|
 |Offline #2|x|1|-//-|
 |JS SVG|x|2|Nemá smysl pro use case|
+
+Celkem: 36  
+
+### Věci navíc:  
+- Implementace OAuth2 přihlášení přes poskytovatele Discord za použití NextAuth
+- Session mezi klientem a http serverem za použití JWT
+- Pokus o mírné využití nejnovějších technologii Next.js jako je Serverside rendering 
