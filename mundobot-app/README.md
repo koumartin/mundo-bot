@@ -5,3 +5,5 @@ Application is based on Next.js 14 and uses FastApi endpoints of the Mundo bot.
 To run the Control panel first make sure that HTTP endpoints are running in the bot and set up all required environment variables in `.env` file in root folder. 
 Then use ```npm run start``` (or first run ```npm run build```).  
 The application will start at some port which you can then use to interact with the bot.
+
+For documentation regarding KAJ see [KAJ Specific documentation](mundobot-app/KAJ_docs.md)
