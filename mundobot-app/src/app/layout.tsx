@@ -34,9 +34,6 @@ export default async function RootLayout({
       <body className={inter.className}>
         <ClientSessionProvider session={session}>
           <nav>
-            <Link href={'/'} style={{ marginTop: '3px' }}>
-              <Image src={'/logo.png'} alt={'LOGO'} width={200} height={50} />
-            </Link>
             <NavBar className={'menu-bar'} />
             <GuildSelector />
             <ProfileSelector session={session} />
