@@ -308,6 +308,7 @@ class PlaybackManager:
             default_sounds (List[str]): List of names of all default sounds.
             guild_sounds (List[str]): List of names of all guild specific sounds.
         """
+        a = [a for a in self.sounds_data.find({"guild_id": guild_id})]
         sound_names = [
             info["name"] for info in self.sounds_data.find({"guild_id": guild_id})
         ]

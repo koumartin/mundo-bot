@@ -58,7 +58,7 @@ In guild with id: {guild_id}"""
 
         @self.app.get('/available-guilds', tags=['guilds'])
         async def available_guilds(user: get_current_user_depends) -> List[GuildDto]:
-            return [GuildDto(id=guild.id, name=guild.name) for guild in self.bot.guilds if guild.get_member(user.discord_user_id) is not None]
+            return [GuildDto(id=str(guild.id), name=guild.name) for guild in self.bot.guilds if guild.get_member(user.discord_user_id) is not None]
 
 
 def start_server(app: FastAPI, loop: asyncio.AbstractEventLoop):
