@@ -27,7 +27,7 @@ class MundobotMc(commands.Bot):
         self.run(self.token)
         
     def player_logged_in_callback(self, player_name: str) -> None:
-        print(f"Player {player_name} logged in.")
+        self.send_player_logged_in(player_name)
         
     def send_player_logged_in(self, player_name: str) -> None:
         for guild in self.guilds:
