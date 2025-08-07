@@ -1,5 +1,6 @@
 import os
 import re
+from threading import Lock
 from typing import Callable, TYPE_CHECKING
 from collections import deque
 from watchdog.observers import Observer
@@ -11,13 +12,16 @@ if TYPE_CHECKING:
 class EventHandler(FileSystemEventHandler):
     def __init__(self, log_file_path: str, player_login_callback: Callable[[str], None]):
         self.log_file_path = log_file_path
-        self.last_position = 0
+        with open(log_file_path, 'r') as f:
+            f.seek(0, os.SEEK_END)  # Move to the end of the file
+            self.last_position = f.tell() # Store end of the file
         self.player_login_callback = player_login_callback
     
     def on_modified(self, event):
         if event.is_directory or event.src_path != self.log_file_path:
             return
         
+        print(self.last_position)
         with open(self.log_file_path, 'r') as f:
             f.seek(self.last_position)  # Move to the end of the file
             for line in f:
