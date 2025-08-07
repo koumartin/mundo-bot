@@ -21,7 +21,6 @@ class EventHandler(FileSystemEventHandler):
         if event.is_directory or event.src_path != self.log_file_path:
             return
         
-        print(self.last_position)
         with open(self.log_file_path, 'r') as f:
             f.seek(self.last_position)  # Move to the end of the file
             for line in f:
