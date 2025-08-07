@@ -23,6 +23,7 @@ class MundobotMc(commands.Bot):
         self.run(self.token)
 
     def start_running_managed(self):
+        self.player_logged_in_watcher.start_watching()
         self.run(self.token)
         
     def player_logged_in_callback(self, player_name: str) -> None:

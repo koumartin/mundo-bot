@@ -15,20 +15,23 @@ class EventHandler(FileSystemEventHandler):
         self.player_login_callback = player_login_callback
     
     def on_modified(self, event):
-        if event.is_directory or event.src_path == self.log_file_path:
-            with open(self.log_file_path, 'r') as f:
-                f.seek(0, os.SEEK_END)  # Move to the end of the file
-                for line in f:
-                    player_name = self.parse_player_login(line)
-                    if player_name:
-                        self.player_login_callback(player_name)
-                self.last_position = f.tell()  # Update the last position
+        if event.is_directory or event.src_path != self.log_file_path:
+            return
+        
+        with open(self.log_file_path, 'r') as f:
+            f.seek(self.last_position)  # Move to the end of the file
+            for line in f:
+                player_name = self.parse_player_login(line)
+                if player_name:
+                    self.player_login_callback(player_name)
+            self.last_position = f.tell()  # Update the last position
 
     def parse_player_login(self, line: str) -> str | None:
         # [21:06:23] [Server thread/INFO] [minecraft/MinecraftServer]: <player_name> joined the game
         if "joined the game" in line:
             match = re.search(r"]: (\w+) joined the game", line)
             if match:
+                print(f"Detected player login: {match.group(1)}")
                 return match.group(1)
         return None
 
@@ -43,6 +46,7 @@ class MinecraftPlayerWatch:
         self.observer.schedule(self.event_handler, os.path.dirname(log_file_path), recursive=False)              
         
     def start_watching(self):
+        print(f"Starting to watch log file: {self.log_file_path}")
         self.observer.start()
         
     def stop_watching(self):
