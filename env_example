@@ -15,3 +15,6 @@ APP_DISCORD_SECRET=<Secret of app in discord developer portal>
 NEXTAUTH_URL=<url of the application in the server>
 NEXTAUTH_SECRET='secret'
 API_URL=<url of the api endpoints root>
+
+mcAnnouncementsDiscordChannelName=<Name of the text channel to use for minecraft announcements>
+logFilePath=<Absolute path to the log file to watch>
