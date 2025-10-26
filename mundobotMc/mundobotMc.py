@@ -44,4 +44,5 @@ class MundobotMc(commands.Bot):
             channel = [channel for channel in guild.text_channels if channel.name == self.discord_channel_name]
             for channel in channel:
                 await channel.send(f"Právě se připojil {player_name}. Everyone, get in here! Jdeme kopat.\n" + 
-                                   f"Aktuálně Majní a Kraftí: {', '.join(self.logged_in_players)}")
+                                   f"Aktuálně Majní a Kraftí: {', '.join(self.logged_in_players)}" + 
+                                   (f"\nFULLLLL HOUSE" if len(self.logged_in_players) + 1 > 3 else ""))
