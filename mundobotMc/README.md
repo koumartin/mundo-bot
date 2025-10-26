@@ -9,7 +9,7 @@ Next step is setting up .env file - required fields are
 - ```logFilePath```: Path to the latest.log file of the Minecraft server.
 
 ## Run in a docker
-First build or pull ```mundobot-mc``` docker image.  
+First build or pull ```mundobot-mc``` docker image.  (```docker build -f mundobotMc/Dockerfile -t mundobot-mc:latest .```)
 Then you need to either: 
 1. create .env file with just ```botToken``` and ```mcAnnouncementsDiscordChannelName``` variables and mount it in the root directory of the container using ```-v <path/to/env>:/app/.env```
 2. or create env file locally and pass it in using ```--env-file <envfile/path>``` option.
